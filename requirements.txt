@@ -1,0 +1,8 @@
+ipykernel
+matplotlib
+pandas
+tensorboard
+torch
+torchinfo
+torchvision
+tqdm

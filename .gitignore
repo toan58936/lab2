@@ -1,0 +1,22 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Downloaded datasets and generated training artifacts
+data/
+models/
+runs/
+*.pth
+*.pt
+*.ckpt
+
+# Jupyter transient files
+.ipynb_checkpoints/
+
+# Operating system files
+Thumbs.db
+.DS_Store
