@@ -8,10 +8,15 @@ from torchvision.models import VGG16_Weights, ResNet18_Weights
 
 class CIFAR10ModelV0(nn.Module):
 
-    def __init__(self, num_classes: int = 10, freeze_backbone: bool = True) -> None:
+    def __init__(
+        self,
+        num_classes: int = 10,
+        freeze_backbone: bool = True,
+        pretrained: bool = True,
+    ) -> None:
         super().__init__()
-        # Tải VGG16 với trọng số pretrained ImageNet
-        self.model = models.vgg16(weights=VGG16_Weights.IMAGENET1K_V1)
+        weights = VGG16_Weights.IMAGENET1K_V1 if pretrained else None
+        self.model = models.vgg16(weights=weights)
 
         if freeze_backbone:
             for param in self.model.parameters():
@@ -30,10 +35,15 @@ class CIFAR10ModelV0(nn.Module):
 
 class CIFAR10ModelV1(nn.Module):
 
-    def __init__(self, num_classes: int = 10, freeze_backbone: bool = True) -> None:
+    def __init__(
+        self,
+        num_classes: int = 10,
+        freeze_backbone: bool = True,
+        pretrained: bool = True,
+    ) -> None:
         super().__init__()
-        # Tải ResNet-18 với trọng số pretrained ImageNet
-        self.model = models.resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+        weights = ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
+        self.model = models.resnet18(weights=weights)
 
         # Đóng băng toàn bộ backbone (mọi layer trừ fc)
         if freeze_backbone:
@@ -58,15 +68,29 @@ MODEL_NAMES = ("v0", "v1")
 
 def build_model(name: str,
                 num_classes: int = 10,
-                freeze_backbone: bool = True) -> nn.Module:
+                freeze_backbone: bool = True,
+                pretrained: bool = True) -> nn.Module:
+    """Create one of the project classifiers.
+
+    Set ``pretrained=False`` when a complete trained checkpoint will be loaded,
+    avoiding an unnecessary ImageNet weights download.
+    """
 
     name = name.lower()
 
     if name == "v0":
-        return CIFAR10ModelV0(num_classes=num_classes, freeze_backbone=freeze_backbone)
+        return CIFAR10ModelV0(
+            num_classes=num_classes,
+            freeze_backbone=freeze_backbone,
+            pretrained=pretrained,
+        )
 
     if name == "v1":
-        return CIFAR10ModelV1(num_classes=num_classes, freeze_backbone=freeze_backbone)
+        return CIFAR10ModelV1(
+            num_classes=num_classes,
+            freeze_backbone=freeze_backbone,
+            pretrained=pretrained,
+        )
 
     raise ValueError(
         f"Unknown model name '{name}'. Choose one of {MODEL_NAMES}."

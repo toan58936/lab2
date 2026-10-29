@@ -9,6 +9,7 @@ __pycache__/
 # Downloaded datasets and generated training artifacts
 data/
 models/
+artifacts/
 runs/
 *.pth
 *.pt

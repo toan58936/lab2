@@ -35,7 +35,7 @@ lab2/
 │   └── utils.py                       # seed, device, lưu/nạp checkpoint (.pth)
 │
 ├── data/                              # Tự động tải CIFAR-10 (~170 MB) khi chạy lần đầu
-├── models/                            # Lưu trữ checkpoint trọng số (.pth) tốt nhất
+├── artifacts/                         # Checkpoint + history/config của các lần train (không đưa lên Git)
 ├── runs/                              # Thư mục log TensorBoard (tự sinh khi huấn luyện)
 ├── requirements.txt                   # Danh sách thư viện phụ thuộc
 ├── lab2_plan.md                       # Kế hoạch và checklist triển khai chi tiết
@@ -76,7 +76,15 @@ Nếu dùng GPU NVIDIA, hãy chọn lệnh cài PyTorch phù hợp với hệ đ
 2. Chọn Kernel là môi trường ảo `.venv` vừa tạo.
 3. Chạy các cell tuần tự từ trên xuống dưới.
 
-### 3. Giám sát bằng TensorBoard
+### 3. Lưu và dùng lại kết quả huấn luyện
+
+Trong Section 0, đặt `RUN_MODE = "train"` để huấn luyện các mô hình và lưu checkpoint tốt nhất, lịch sử loss/accuracy cùng cấu hình vào `artifacts/`. Sau khi chạy thành công một lần, đổi thành `RUN_MODE = "reuse"` rồi chạy lại notebook để bỏ qua huấn luyện và tiếp tục các phần so sánh/đánh giá. Chế độ reuse báo lỗi rõ ràng nếu thiếu artifact; không tự âm thầm train lại. Artifact được lưu riêng cho VGG16, ResNet-18 và ResNet-18 fine-tuned.
+
+Trên Colab, notebook tự mount Drive và dùng `MyDrive/Lab2/artifacts/` để giữ kết quả qua các phiên runtime. Đặt `going_modular/` tại `MyDrive/Lab2/`; CIFAR-10 được tải vào vùng tạm `/content/cifar10_data` để đọc nhanh. Trên máy local, code và artifact nằm trong thư mục dự án.
+
+Không commit `artifacts/`, dataset hay TensorBoard logs lên GitHub. Để đổi hyperparameter hoặc tạo một lần chạy mới, chọn `RUN_MODE = "train"`; artifact cùng tên sẽ được cập nhật.
+
+### 4. Giám sát bằng TensorBoard
 
 Trong quá trình huấn luyện ở Section 4, quá trình học (Loss & Accuracy trên tập Train và Validation) sẽ được tự động ghi log vào thư mục `runs/`. Để mở giao diện trực quan:
 
@@ -96,8 +104,8 @@ Notebook được cấu trúc chặt chẽ thành **8 Section** tương ứng đ
 1. **Section 0 — Setup & Config:** Tự động nhận diện đường dẫn `ROOT`, import thư viện và thiết lập inline hyperparameters (`SEED=42`, `BATCH_SIZE=32`, `LR=1e-3`, `EPOCHS=5`, `VAL_SIZE=5000`).
 2. **Section 1 — Load & Visualize Data:** Tải CIFAR-10, phân chia tập (45.000 train / 5.000 val / 10.000 test), kiểm tra kích thước và vẽ lưới ảnh minh họa kèm nhãn.
 3. **Section 2 — Khám phá kiến trúc Pre-trained:** Soi chi tiết cấu trúc mạng VGG16, ResNet-18 qua `torchinfo.summary()`; phân tích số lượng tham số tổng vs tham số trainable; demo inline kiến trúc DenseNet-121.
-4. **Section 3 — Adapt Model:** Thay thế lớp phân loại cuối cùng (Classifier Head) cho 10 lớp CIFAR-10; kiểm tra output shape với dummy tensor `[2, 3, 224, 224]`; giải thích chiến lược đóng băng (freezing).
-5. **Section 4 — Train & Monitor với TensorBoard:** Huấn luyện `v0` (VGG16) và `v1` (ResNet-18) với `engine.train()`; lưu checkpoint tốt nhất vào `models/`; log trực tiếp vào TensorBoard.
+4. **Section 3 — Kiểm tra model đã adapt:** Classifier 10 lớp được cấu hình trong `model_builder.py`; notebook xác nhận output shape `[2, 10]` và giải thích chiến lược đóng băng (freezing).
+5. **Section 4 — Train & Monitor với TensorBoard:** Huấn luyện `v0` (VGG16) và `v1` (ResNet-18) với `engine.train()`; chọn checkpoint tốt nhất theo validation accuracy, lưu weights/history/config vào `artifacts/`, log vào TensorBoard; hỗ trợ nạp lại bằng `RUN_MODE="reuse"`.
 6. **Section 5 — So sánh Models:** So sánh đường cong Loss/Accuracy qua các epoch, so sánh thời gian huấn luyện và hiệu quả hội tụ giữa VGG16 và ResNet-18.
 7. **Section 6 — Thử nghiệm Fine-tuning:** Mở đóng băng (unfreeze) một số block cuối của ResNet-18, huấn luyện bổ sung với learning rate nhỏ (`1e-4`) và so sánh đối chứng giữa Frozen vs Fine-tuned.
 8. **Section 7 — Đánh giá trên tập Test:** Đánh giá khách quan mô hình tốt nhất trên tập Test (10.000 ảnh chưa từng thấy); vẽ ma trận nhầm lẫn (**Confusion Matrix**), thống kê độ chính xác theo từng lớp (**Per-class Accuracy**) và tìm ra các cặp nhãn hay nhầm lẫn nhất.

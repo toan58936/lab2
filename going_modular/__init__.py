@@ -16,6 +16,7 @@ Hoặc flat import:
         compute_confusion_matrix, per_class_accuracy, top_confusions,
         plot_history, plot_confusion_matrix, plot_sample_predictions,
         set_seed, get_device, save_model, load_model,
+        save_training_metadata, load_training_artifacts,
     )
 """
 
@@ -57,6 +58,8 @@ from .utils import (
     get_device,
     save_model,
     load_model,
+    save_training_metadata,
+    load_training_artifacts,
     print_train_time,
 )
 
@@ -91,5 +94,7 @@ __all__ = [
     "get_device",
     "save_model",
     "load_model",
+    "save_training_metadata",
+    "load_training_artifacts",
     "print_train_time",
 ]
