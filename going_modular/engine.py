@@ -30,7 +30,7 @@ def train_step(model: torch.nn.Module,
         loss = loss_fn(y_pred, y)                  # 2. Tính loss
 
         optimizer.zero_grad()                      # 3. Reset gradient
-        loss.backward()                            # 4. Backpropagation
+        loss.backward()                            # 4. Backpropagation-> gradent dsecent -> optimized 
         optimizer.step()                           # 5. Cập nhật tham số
 
         batch_size = y.size(0)
