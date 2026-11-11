@@ -213,3 +213,8 @@ Tiền xử lý được lấy trực tiếp từ weights tương ứng trong to
 | Tải Pretrained Weights rất chậm | Trọng số mạng (đặc biệt là VGG16 ~528MB) lớn | Quá trình tải chỉ diễn ra một lần duy nhất (được cache tại thư mục `~/.cache/torch/hub/checkpoints`). Hãy kiên nhẫn đợi tải xong. |
 | `CUDA out of memory` | Bộ nhớ GPU không đủ khi xử lý batch 224×224 | Giảm `BATCH_SIZE` xuống `16` trong cell cấu hình ở Section 0. |
 | Cảnh báo BatchNorm khi backbone bị freeze | PyTorch giữ eval mode cho BatchNorm | `set_train_mode(model, cfg)` trong `engine.py` giữ trạng thái `eval()` cho BatchNorm của phần đóng băng khi train. |
+## Ghi chú tìm hiểu dự án
+- Đã tìm hiểu cấu trúc thư mục của dự án.
+- Thư mục going_modular chứa các module Python.
+- Thư mục tests chứa các bài kiểm thử.
+- Thư mục notebooks chứa các notebook phục vụ thử nghiệm.
