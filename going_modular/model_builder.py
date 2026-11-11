@@ -13,13 +13,7 @@ from torchvision.models import VGG16_Weights, ResNet18_Weights
 # ---------------------------------------------------------------------------
 
 class MyModel(nn.Module):
-    """Wrapper quanh backbone torchvision (ResNet-18 / VGG16) với head thay thế.
 
-    Cấu trúc:
-      self.backbone  — kiến trúc torchvision gốc, đã bỏ lớp đầu ra (fc / classifier).
-      self.head      — Linear (hoặc Dropout+Linear) đầu ra cho NUM_CLASSES.
-    forward: x → backbone(x) → head → logits.
-    """
 
     def __init__(
         self,
@@ -215,26 +209,6 @@ def build_model(cfg: ModelConfig) -> nn.Module:
                 param.requires_grad = True
 
     return model
-
-
-# ---------------------------------------------------------------------------
-# Transforms
-# ---------------------------------------------------------------------------
-
-def get_transforms(cfg: ModelConfig, weights: str | None = None):
-
-    weights_name = weights if weights is not None else cfg.weights
-    if weights_name is None:
-        raise ValueError(
-            "Không xác định được trọng số để lấy transform. "
-            "Truyền weights vào get_transforms hoặc đặt cfg.weights."
-        )
-    from .data_setup import get_pretrained_transform
-
-    return get_pretrained_transform(
-        model_name=cfg.arch,
-        weights_name=weights_name,
-    )
 
 
 # ---------------------------------------------------------------------------

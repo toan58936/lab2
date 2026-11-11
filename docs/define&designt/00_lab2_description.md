@@ -108,7 +108,7 @@ Luồng: `Notebook → data_setup + model_builder → engine.train → artifacts
 | `seed` | 42 | |
 | `val_size` | 5000 | 10% của Train gốc |
 | `batch_size` | 32 | |
-| `epochs` (Feature Extraction) | 5 | |
+| `epochs` (Feature Extraction) | 3 | Cấu hình thử nghiệm hiện tại (có thể tăng lên 5 theo thiết kế ban đầu) |
 | `lr_head` | 1e-3 | Optimizer Adam |
 | `epochs` (Fine-Tuning) | 3 | Chạy tiếp từ baseline |
 | `lr_backbone` | 1e-4 | Chỉ áp dụng cho khối được mở khóa |
@@ -118,12 +118,11 @@ Luồng: `Notebook → data_setup + model_builder → engine.train → artifacts
 
 | Thí nghiệm | Kiến trúc | Chiến lược | Epochs | `lr_head` / `lr_backbone` | Batch | Khởi tạo từ | Mục đích |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `v0_vgg16` | VGG16 | Feature Extraction | 5 | 1e-3 / — | 32 | ImageNet | So sánh kiến trúc |
-| `v1_resnet18` | ResNet-18 | Feature Extraction | 5 | 1e-3 / — | 32 | ImageNet | **Baseline** |
-| `v1_resnet18_finetune` | ResNet-18 | Fine-Tuning | 3 | 1e-3 / 1e-4 | 32 | `v1_resnet18` | Tác động của Fine-Tuning |
-| `v2_resnet18_lr1e-2` | ResNet-18 | Feature Extraction | 5 | 1e-2 / — | 32 | ImageNet | LR cao |
-| `v2_resnet18_lr1e-4` | ResNet-18 | Feature Extraction | 5 | 1e-4 / — | 32 | ImageNet | LR thấp |
-| `v2_resnet18_bs64` | ResNet-18 | Feature Extraction | 5 | 1e-3 / — | 64 | ImageNet | Batch size |
+| `v0_vgg16` | VGG16 | Feature Extraction | 3 | 1e-3 / — | 32 | ImageNet | So sánh kiến trúc |
+| `v1_resnet18` | ResNet-18 | Feature Extraction | 3 | 1e-3 / — | 32 | ImageNet | **Baseline** |
+| `v1_resnet18_finetune` | ResNet-18 | Fine-Tuning | 3 | 1e-3 / 1e-4 | 32 | `v1_resnet18` | Tác động của Fine-Tuning (run fine-tune duy nhất) |
+
+> **Ghi chú epochs:** Cấu hình hiện tại dùng 3 epoch để thử nghiệm nhanh; có thể tăng Feature Extraction lên 5 epoch (theo thiết kế ban đầu) khi chạy chính thức.
 
 Mỗi run `v2` chỉ thay **một** yếu tố so với baseline. Đây là khảo sát có kiểm soát, không phải grid search.
 
@@ -141,17 +140,26 @@ Mỗi thí nghiệm chia thành ba nhánh:
 
 File `.pth` phát hành ngoài Git (GitHub Release hoặc Drive); `README.md` ghi link tải.
 
-### 7.5. Chế độ chạy
+### 7.5. Chế độ chạy (do người dùng chọn)
 
-- **`train`:** huấn luyện và lưu artifacts. Không ghi đè run đã tồn tại.
-- **`reuse`:** nạp kiến trúc (`weights=None`) rồi nạp `best_model.pth`. Thiếu file huấn luyện thì báo lỗi, **không** tự train. Thiếu riêng `test_metrics.json` thì đánh giá Test một lần rồi lưu vào `outputs/`.
+Người dùng tự thiết lập hành động cho từng run (ví dụ `RUN_PLAN` / `DEFAULT_RUN_ACTION` trong notebook); code **không tự suy luận** nên dùng trạng thái nào.
+
+| Action | Ý nghĩa | Điều kiện / hành vi |
+| :--- | :--- | :--- |
+| `train` | Huấn luyện đầy đủ từ đầu | Nếu artifacts đã tồn tại: không tự xóa; chỉ cho phép chạy lại khi `FORCE_RETRAIN=True` (xóa artifacts cũ của run rồi train mới). Fine-tune nạp `v1_resnet18/best_model.pth` trước khi train. |
+| `resume` | Tiếp tục từ trạng thái dang dở | Yêu cầu `last_checkpoint.pth`; kiểm tra `done_epochs < target_epochs` rồi gọi `engine.train(resume=True)` để nạp model/optimizer/history/epoch và chạy tiếp. Với fine-tune, nạp checkpoint của **chính run fine-tune** (không nạp baseline). |
+| `reuse` | Bỏ qua huấn luyện, dùng artifacts có sẵn | Yêu cầu `config.json`, `history.json`, `best_model.pth`. Không train. Thiếu riêng `test_metrics.json` thì đánh giá Test một lần rồi lưu vào `outputs/`. |
+
+- **Chọn run:** có thể chạy 1 run (`RUN_ID`) hoặc nhiều run tuần tự (`RUN_IDS`, list hoặc chuỗi phân tách dấu phẩy). Mỗi run dùng spec/dataloader/artifacts/output/log riêng. `v1_resnet18_finetune` là **run fine-tune duy nhất**, phải chạy sau `v1_resnet18` (hoặc baseline đã có `best_model.pth`).
 
 ### 7.6. Quy ước chung
 
 1. Gọi `set_seed(42)` trước mỗi thí nghiệm; tạo DataLoader riêng cho từng thí nghiệm.
-2. Transform lấy từ `model_builder.get_transforms(...)` rồi truyền vào `data_setup`; `data_setup` không import `model_builder`.
-3. Fine-Tuning dựng mô hình với `weights=None`, nạp checkpoint baseline, rồi mở khóa `layer4`, dùng optimizer mới.
-4. Chọn checkpoint bằng Validation; không dùng Test để điều chỉnh bất cứ thứ gì.
+2. Transform lấy từ `data_setup.get_pretrained_transform(...)` (hoặc qua `create_train_val_test_dataloaders`) theo kiến trúc/weights của run; `data_setup` không import `model_builder`.
+3. Fine-Tuning dựng mô hình với `weights=None`, nạp checkpoint baseline `v1_resnet18/best_model.pth` trước khi train, rồi mở khóa `layer4`, dùng optimizer mới (param groups head/backbone).
+4. Khi chạy nhiều run, tạo dataloader theo spec của từng run (batch size/transform có thể khác).
+5. Chỉ có một run fine-tune (`v1_resnet18_finetune`, mở `layer4`); các run khác là feature extraction.
+6. Chọn checkpoint bằng Validation; không dùng Test để điều chỉnh bất cứ thứ gì.
 
 ---
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import pytest
-from PIL import Image
+
 from unittest.mock import patch
 
 from going_modular.model_builder import (
@@ -24,7 +24,6 @@ from going_modular.model_builder import (
     count_params,
     MyModel,
     get_param_groups,
-    get_transforms,
     set_train_mode,
 )
 
@@ -317,29 +316,6 @@ def test_t13c_config_is_frozen():
     cfg = ModelConfig()
     with pytest.raises(Exception):
         cfg.arch = "vgg16"
-
-
-def test_t14_transforms_without_weights():
-    """T14: get_transforms(ModelConfig(weights=None)) → ValueError."""
-    with pytest.raises(ValueError):
-        get_transforms(ModelConfig(weights=None))
-
-
-def test_t14b_transforms_output():
-    """T14b: Transform ảnh CIFAR-10 32×32 → tensor (3, 224, 224)."""
-    img = Image.new("RGB", (32, 32), color=(0, 0, 0))
-    transform = get_transforms(ModelConfig(weights="IMAGENET1K_V1"))
-    out = transform(img)
-    assert out.shape == (3, 224, 224)
-
-
-def test_t14c_transform_weights_override():
-    """T14c: ModelConfig(weights=None) + get_transforms(weights="IMAGENET1K_V1") → transform hợp lệ."""
-    cfg = ModelConfig(arch="resnet18", weights=None)
-    transform = get_transforms(cfg, weights="IMAGENET1K_V1")
-    img = Image.new("RGB", (32, 32), color=(0, 0, 0))
-    out = transform(img)
-    assert out.shape == (3, 224, 224)
 
 
 # ---------------------------------------------------------------------------

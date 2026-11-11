@@ -4,9 +4,9 @@ going_modular — CIFAR-10 Transfer Learning helpers.
 Import theo module (cách dùng trong notebook):
     from going_modular import data_setup, engine, evaluate, model_builder, utils
 
-Hoặc flat import (14 symbols theo hợp đồng 00_lab2_description.md mục 2.8.6):
+Hoặc flat import (13 symbols theo hợp đồng 00_lab2_description.md mục 2.8.6):
     from going_modular import (
-        ModelConfig, build_model, get_transforms, count_params,
+        ModelConfig, build_model, count_params,
         MyModel, set_train_mode, get_param_groups,
         create_train_val_test_dataloaders, train, evaluate_step,
         set_seed, get_device, run_inference, evaluate_predictions,
@@ -24,7 +24,6 @@ from .model_builder import (
     count_params,
     MyModel,
     get_param_groups,
-    get_transforms,
     set_train_mode,
     ModelConfig,
     ARCH_SPECS,
@@ -83,10 +82,9 @@ from .utils import (
 )
 
 __all__ = [
-    # 14 symbols theo hợp đồng 00_lab2_description.md mục 2.8.6
+    # 13 symbols theo hợp đồng 00_lab2_description.md mục 2.8.6
     "ModelConfig",
     "build_model",
-    "get_transforms",
     "count_params",
     "MyModel",
     "set_train_mode",

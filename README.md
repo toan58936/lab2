@@ -139,13 +139,26 @@ Notebook chính là [notebooks/pretrained_models.ipynb](notebooks/pretrained_mod
 1. Đặt dữ liệu CIFAR-10 trong `MyDrive/lab2/data/` (tên thư mục phân biệt chữ hoa/thường). Không cần chép `going_modular/` lên Drive; notebook clone code từ GitHub vào Colab runtime.
 2. Mở notebook `notebooks/pretrained_models.ipynb` từ checkout GitHub trong Colab và chọn GPU nếu có.
 3. Chạy cell setup để mount Drive. Notebook dùng `MyDrive/lab2` làm data/artifact root, `/content/lab2` cho code checkout và `/content/cifar10_data` làm bản dữ liệu runtime.
-4. Với code Phase 8 hiện tại, chỉ chạy đến hết phần setup/configuration rồi dừng. Các cell thực nghiệm phía dưới chưa được nối đầy đủ với sáu `RUN_ID`; không chạy tuần tự qua chúng như một lần huấn luyện Phase 8.
+4. Với code hiện tại, sau khi cấu hình `RUN_ID`/`RUN_IDS` và kiểm tra setup, chạy tuần tự các cell data → model → train/reuse → so sánh → đánh giá để thực thi (các) run đã chọn. Có thể chạy từng run riêng lẻ hoặc truyền danh sách run để chạy liên tiếp.
 
-### Trạng thái các run
+### Trạng thái và hành động các run
 
-Notebook hiện khai báo `RUN_MODE`, `RESUME` và cấu hình cho sáu `RUN_ID`, nhưng các cell huấn luyện cũ vẫn chạy các luồng cố định VGG16, ResNet-18 và fine-tuning, chưa được điều khiển đầy đủ bởi cấu hình run đã chọn. Vì vậy, chưa thể dùng chúng để thực hiện sáu run Phase 8; cần tích hợp các cell train/resume/reuse trước khi bắt đầu huấn luyện thật.
+Notebook hỗ trợ chọn **1 hoặc nhiều run chạy tuần tự** qua `RUN_ID` hoặc `RUN_IDS`, và **người dùng tự chọn hành động** cho từng run qua `RUN_PLAN` / `DEFAULT_RUN_ACTION` (code không tự suy luận):
 
-`reuse` dùng artifacts đã lưu để bỏ qua huấn luyện; chỉ chọn chế độ này khi các artifacts cần thiết đã tồn tại. Không xóa hay ghi đè artifacts cũ để bắt đầu lại nếu chưa sao lưu và xác nhận đúng thư mục run.
+- `train`: huấn luyện đầy đủ từ đầu. Nếu artifacts đã tồn tại, không tự xóa; chỉ train lại khi `FORCE_RETRAIN=True`.
+- `resume`: tiếp tục từ `last_checkpoint.pth` khi dang dở (phù hợp Colab ngắt kết nối), yêu cầu `done_epochs < target_epochs`.
+- `reuse`: nạp artifacts có sẵn (`config/history/best_model.pth`), không train.
+
+Ví dụ cấu hình:
+
+```python
+RUN_IDS = ["v0_vgg16", "v1_resnet18"]
+RUN_PLAN = {"v0_vgg16": "reuse", "v1_resnet18": "resume"}
+DEFAULT_RUN_ACTION = "train"
+FORCE_RETRAIN = False
+```
+
+Mỗi run build/train/resume/reuse/đánh giá theo spec riêng, lưu artifacts vào `artifacts/<RUN_ID>/` và outputs vào `outputs/<date>/<RUN_ID>/<EVAL_ID>/`. Hiện có 3 run: `v0_vgg16`, `v1_resnet18` (feature extraction) và `v1_resnet18_finetune` (**run fine-tune duy nhất**). Fine-tune: train mới nạp `v1_resnet18/best_model.pth`; resume nạp checkpoint của chính run fine-tune. Test set chỉ dùng đánh giá cuối.
 
 Không commit dataset, TensorBoard logs hoặc checkpoint `.pth` lên GitHub. Config, history, metrics và hình kết quả được quản lý theo quy ước artifacts của dự án.
 
