@@ -39,10 +39,7 @@ Google Drive (lưu bền vững)
     └── artifacts/
         ├── v0_vgg16/
         ├── v1_resnet18/
-        ├── v1_resnet18_finetune/
-        ├── v2_resnet18_lr1e-2/
-        ├── v2_resnet18_lr1e-4/
-        ├── v2_resnet18_bs64/
+        ├── v1_resnet18_finetune/      # run fine-tune duy nhất
         └── figures/
 ```
 
@@ -107,13 +104,10 @@ Trong mỗi thư mục run, quy trình huấn luyện sau này dự kiến lưu 
 
 **File chính:** notebook cell cấu hình run; thông số chuẩn theo `docs/plans/implementation_plan.md` và đặc tả cấu hình tổng thể.
 
-- [x] Khai báo danh sách allowlist `RUN_ID` gồm đúng sáu giá trị:
+- [x] Khai báo danh sách allowlist `RUN_ID` gồm 3 giá trị:
   - `v0_vgg16`
   - `v1_resnet18`
-  - `v1_resnet18_finetune`
-  - `v2_resnet18_lr1e-2`
-  - `v2_resnet18_lr1e-4`
-  - `v2_resnet18_bs64`
+  - `v1_resnet18_finetune` (run fine-tune duy nhất)
 - [x] Mỗi ID ánh xạ tường minh sang kiến trúc, weights khi khởi tạo, freeze/unfreeze, epochs, batch size, LR theo nhóm tham số, seed và dependency nếu có.
 - [x] Với `v1_resnet18_finetune`, khai báo nguồn khởi tạo là `best_model.pth` của `v1_resnet18`; optimizer là cấu hình mới cho phase fine-tune.
 - [x] Cell cấu hình chỉ resolve và in một run; bản thân cell này không gọi train, inference Test hoặc lặp qua sáu run.

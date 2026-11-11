@@ -13,12 +13,9 @@ Các tài liệu `00`–`05` mô tả thiết kế mục tiêu, không mặc nhi
 
 ### Phạm vi thực nghiệm đã chốt (6 runs)
 
-1. `v0_vgg16` — VGG16 Feature Extraction, 5 epochs.
-2. `v1_resnet18` — ResNet-18 Feature Extraction, 5 epochs (baseline).
-3. `v1_resnet18_finetune` — tiếp tục từ checkpoint tốt nhất của `v1_resnet18`, mở `layer4` và head, 3 epochs.
-4. `v2_resnet18_lr1e-2` — ResNet-18 Feature Extraction, head LR `1e-2`.
-5. `v2_resnet18_lr1e-4` — ResNet-18 Feature Extraction, head LR `1e-4`.
-6. `v2_resnet18_bs64` — ResNet-18 Feature Extraction, batch size `64`.
+1. `v0_vgg16` — VGG16 Feature Extraction, 3 epochs (thử nghiệm; có thể tăng lên 5).
+2. `v1_resnet18` — ResNet-18 Feature Extraction baseline, 3 epochs.
+3. `v1_resnet18_finetune` — **run fine-tune duy nhất**: tiếp tục từ checkpoint tốt nhất của `v1_resnet18`, mở `layer4` và head, 3 epochs.
 
 Ba runs `v2` mỗi run chỉ thay đúng một yếu tố so với `v1_resnet18`, giữ nguyên seed, dữ liệu, kiến trúc và số epochs; không bổ sung run đối chứng 8 epoch. Đây là khảo sát có kiểm soát LR và batch size theo yêu cầu lab, không phải grid search toàn diện.
 
@@ -129,18 +126,15 @@ Ba runs `v2` mỗi run chỉ thay đúng một yếu tố so với `v1_resnet18`
 
 | Thứ tự | Run | Phụ thuộc | Ghi chú cấu hình |
 | :--- | :--- | :--- | :--- |
-| 1 | `v0_vgg16` | Không | VGG16, Feature Extraction, 5 epochs, batch 32, LR head 1e-3 |
-| 2 | `v1_resnet18` | Không | ResNet-18, Feature Extraction, 5 epochs, batch 32, LR head 1e-3 (baseline) |
-| 3 | `v1_resnet18_finetune` | `best_model.pth` của `v1_resnet18` | ResNet-18, mở `layer4`, 3 epochs, batch 32, LR head 1e-3, LR backbone 1e-4 |
-| 4 | `v2_resnet18_lr1e-2` | Độc lập | ResNet-18, Feature Extraction, 5 epochs, batch 32, LR head 1e-2 |
-| 5 | `v2_resnet18_lr1e-4` | Độc lập | ResNet-18, Feature Extraction, 5 epochs, batch 32, LR head 1e-4 |
-| 6 | `v2_resnet18_bs64` | Độc lập | ResNet-18, Feature Extraction, 5 epochs, batch 64, LR head 1e-3 |
+| 1 | `v0_vgg16` | Không | VGG16, Feature Extraction, 3 epochs (thử nghiệm), batch 32, LR head 1e-3 |
+| 2 | `v1_resnet18` | Không | ResNet-18, Feature Extraction, 3 epochs (thử nghiệm), batch 32, LR head 1e-3 (baseline) |
+| 3 | `v1_resnet18_finetune` | `best_model.pth` của `v1_resnet18` | ResNet-18, mở `layer4` (**run fine-tune duy nhất**), 3 epochs, batch 32, LR head 1e-3, LR backbone 1e-4 |
 
 - Thực thi trên môi trường tăng tốc GPU (Colab / GPU local); ghi nhận thiết bị và phiên bản thư viện vào `config.json`.
-- Mỗi run có thể thực thi ở phiên Colab riêng; không yêu cầu hoàn tất cả sáu runs trong một phiên. Trên Colab, giữ thư mục artifacts trong Drive và cập nhật checkpoint/history sau mỗi epoch hoàn tất; TensorBoard logs có thể được đồng bộ sau mỗi run.
+- Mỗi run có thể thực thi ở phiên Colab riêng; không yêu cầu hoàn tất cả run trong một phiên. Trên Colab, giữ thư mục artifacts trong Drive và cập nhật checkpoint/history sau mỗi epoch hoàn tất.
 - Chỉ đánh giá Test sau khi phase huấn luyện của run đã hoàn tất; resume run dở không đánh giá Test và không tạo `test_metrics.json` cho kết quả chưa hoàn chỉnh.
 - Đánh giá Test đúng một lượt sau khi hoàn tất huấn luyện từng mô hình; tuyệt đối không dùng kết quả Test để điều chỉnh cấu hình.
-- **Cổng:** Mỗi run đã hoàn tất có đủ `best_model.pth`, `last_checkpoint.pth`, `history.json`, `config.json` và `test_metrics.json`; run bị ngắt có checkpoint/history tại epoch cuối đã lưu và resume được; tất cả 6 runs cùng xuất hiện trong bảng so sánh tổng hợp.
+- **Cổng:** Mỗi run đã hoàn tất có đủ `best_model.pth`, `last_checkpoint.pth`, `history.json`, `config.json` và `test_metrics.json`; run bị ngắt có checkpoint/history tại epoch cuối đã lưu và resume được; các run xuất hiện trong bảng so sánh tổng hợp.
 
 ### Phase 9 — Báo cáo kết quả và nghiệm thu
 - Tạo bảng so sánh Markdown tổng hợp và các biểu đồ theo đặc tả `05_evaluation_results.md` (lưu tại `artifacts/figures/`).

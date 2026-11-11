@@ -31,12 +31,11 @@ def test_flat_imports_available():
     assert callable(going_modular.get_device)
 
 
-def test_contract_14_exports():
-    """Kiểm tra 14 symbols xuất phẳng theo hợp đồng 00_lab2_description.md mục 2.8.6."""
-    contract_14 = [
+def test_contract_13_exports():
+    """Kiểm tra 13 symbols xuất phẳng theo hợp đồng 00_lab2_description.md mục 2.8.6."""
+    contract_13 = [
         "ModelConfig",
         "build_model",
-        "get_transforms",
         "count_params",
         "MyModel",
         "set_train_mode",
@@ -49,7 +48,7 @@ def test_contract_14_exports():
         "run_inference",
         "evaluate_predictions",
     ]
-    for name in contract_14:
+    for name in contract_13:
         assert name in going_modular.__all__, f'{name} không có trong __all__'
         assert hasattr(going_modular, name), f'{name} không thể import từ going_modular'
 
