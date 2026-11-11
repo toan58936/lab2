@@ -164,29 +164,14 @@ Không commit dataset, TensorBoard logs hoặc checkpoint `.pth` lên GitHub. Co
 
 ### 4. Giám sát bằng TensorBoard
 
-Trong quá trình huấn luyện ở Section 4, quá trình học (Loss & Accuracy trên tập Train và Validation) sẽ được tự động ghi log vào thư mục `runs/`. Để mở giao diện trực quan:
+Trong quá trình huấn luyện, loss/accuracy (train/validation) được ghi log TensorBoard theo từng run/phiên (`logs/<RUN_ID>/<SESSION_ID>/`). Để mở giao diện trực quan:
 
 ```bash
-# Trong terminal (đã kích hoạt .venv):
-tensorboard --logdir=runs
+# Trong terminal (đã kích hoạt .venv), trỏ đến thư mục log phù hợp:
+tensorboard --logdir=logs
 ```
 
 Mở trình duyệt truy cập: [http://localhost:6006](http://localhost:6006)
-
----
-
-## 📖 Nội dung Chi tiết trong Notebook (`pretrained_models.ipynb`)
-
-Notebook được cấu trúc chặt chẽ thành **8 Section** tương ứng đầy đủ các bước của bài lab:
-
-1. **Section 0 — Setup & Config:** Tự động nhận diện đường dẫn `ROOT`, import thư viện và thiết lập inline hyperparameters (`SEED=42`, `BATCH_SIZE=32`, `LR=1e-3`, `EPOCHS=5`, `VAL_SIZE=5000`).
-2. **Section 1 — Load & Visualize Data:** Tải CIFAR-10, phân chia tập (45.000 train / 5.000 val / 10.000 test), kiểm tra kích thước và vẽ lưới ảnh minh họa kèm nhãn.
-3. **Section 2 — Khám phá kiến trúc Pre-trained:** Soi chi tiết cấu trúc mạng VGG16, ResNet-18 qua `torchinfo.summary()`; phân tích số lượng tham số tổng vs tham số trainable.
-4. **Section 3 — Kiểm tra model đã adapt:** Classifier 10 lớp được cấu hình trong `model_builder.py`; notebook xác nhận output shape `[2, 10]` và giải thích chiến lược đóng băng (freezing).
-5. **Section 4 — Train & Monitor với TensorBoard:** Huấn luyện `v0` (VGG16) và `v1` (ResNet-18) với `engine.train()`; chọn checkpoint tốt nhất theo validation accuracy, lưu weights/history/config vào `artifacts/`, log vào TensorBoard; hỗ trợ nạp lại bằng `RUN_MODE="reuse"`.
-6. **Section 5 — So sánh Models:** So sánh đường cong Loss/Accuracy qua các epoch, so sánh thời gian huấn luyện và hiệu quả hội tụ giữa VGG16 và ResNet-18.
-7. **Section 6 — Thử nghiệm Fine-tuning:** Mở đóng băng (unfreeze) một số block cuối của ResNet-18, huấn luyện bổ sung với learning rate nhỏ (`1e-4`) và so sánh đối chứng giữa Frozen vs Fine-tuned.
-8. **Section 7 — Đánh giá trên tập Test:** Đánh giá khách quan mô hình tốt nhất trên tập Test (10.000 ảnh chưa từng thấy); vẽ ma trận nhầm lẫn (**Confusion Matrix**), thống kê độ chính xác theo từng lớp (**Per-class Accuracy**) và tìm ra các cặp nhãn hay nhầm lẫn nhất.
 
 ---
 
