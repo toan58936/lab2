@@ -1,3 +1,5 @@
+> **Cập nhật 2026-11-11 (hướng B):** baseline code hiện tại đã chuyển sang model torchvision native (G1 VGG16 `classifier[6]`, ResNet `fc`, state_dict key gốc, không wrapper `MyModel`), flat export 12 symbols, guard checkpoint cũ `backbone.*`/`head.*` (không migrate, cần retrain 3 run). Danh mục run hiện hành: `v0_vgg16`, `v1_resnet18`, `v1_resnet18_finetune`; các tham chiếu 6 run/v2 và 14-symbol export trong kế hoạch dưới đây được giữ như lịch sử phase và cần hiểu theo ngữ cảnh hiện tại.
+
 # Kế hoạch Triển khai Lab 2 — Pre-trained Models trên CIFAR-10
 
 > **Căn cứ:** Đặc tả tổng thể `00` và các đặc tả module `01`–`05`.
@@ -45,7 +47,7 @@ Ba runs `v2` mỗi run chỉ thay đúng một yếu tố so với `v1_resnet18`
 - `test_metrics.json` giữ `y_true`, `y_pred` và confidence tối đa theo mẫu, không lưu logits. `train_time_phase_s` và `train_time_total_s` phân biệt thời gian phase với thời gian cộng phase nguồn.
 - `pin_memory=torch.cuda.is_available()` theo khả năng CUDA của runtime, không phụ thuộc thiết bị được yêu cầu cho model. Stratified split được cam kết cho cấu hình CIFAR-10 cân bằng của lab; mean/std lấy từ preprocessing preset, chỉ fallback ImageNet khi config xác nhận.
 - Tập Test chỉ dùng để đánh giá cuối; chọn checkpoint bằng Validation.
-- **Hợp đồng xuất API của `going_modular/__init__.py`:** Test của từng module có thể sử dụng import trực tiếp từ submodule tương ứng (`from going_modular.model_builder import ...`) trong quá trình phát triển Phase 2–6. Mỗi Phase cập nhật export tương ứng khi API sẵn sàng. Phase 7 nghiệm thu toàn diện hợp đồng export phẳng 14 symbols theo `00_lab2_description.md` mục 2.8.6.
+- **Hợp đồng xuất API của `going_modular/__init__.py`:** Test của từng module có thể sử dụng import trực tiếp từ submodule tương ứng (`from going_modular.model_builder import ...`) trong quá trình phát triển Phase 2–6. Mỗi Phase cập nhật export tương ứng khi API sẵn sàng. Phase 7 nghiệm thu toàn diện hợp đồng export phẳng (đã cập nhật: 12 symbols hiện hành, không `MyModel`).
 
 ---
 
@@ -116,7 +118,7 @@ Ba runs `v2` mỗi run chỉ thay đúng một yếu tố so với `v1_resnet18`
 - Trên Colab, mount Drive trước khi chọn artifact root; lưu checkpoint resume và history sau mỗi epoch vào thư mục run trên Drive. Không dựa vào thao tác sao lưu sau khi cả run hoàn tất mới bảo vệ checkpoint.
 - Khi bắt đầu run mới, nếu artifacts của `RUN_ID` đã tồn tại thì dừng với hướng dẫn rõ ràng, không tự xóa/ghi đè. Khi resume, xác nhận checkpoint tồn tại và phase config khớp; nếu không khớp hoặc không đọc/ghi được thì báo lỗi, không tự khởi động lại từ đầu.
 - Trong Fine-Tuning: dựng mô hình tương ứng từ `best_model.pth` của baseline với `weights=None`, mở khóa `layer4`, tạo optimizer mới với 2 nhóm LR và nối tiếp epoch qua `start_epoch=5`.
-- Kiểm tra toàn diện hợp đồng export phẳng của package `going_modular/__init__.py` đủ 14 symbols theo `00` mục 2.8.6.
+- Kiểm tra toàn diện hợp đồng export phẳng của package `going_modular/__init__.py` theo hợp đồng export hiện hành (12 symbols).
 - Sau khi notebook không còn call site nào dùng `torchinfo`, tiến hành gỡ bỏ `torchinfo` khỏi `requirements.txt`.
 - Thử nghiệm pipeline ngắn (smoke test notebook) trên tập dữ liệu nhỏ trước khi chạy chính thức.
 - Mô phỏng ngắt sau một epoch đã lưu, khởi động lại notebook và xác minh cùng `RUN_ID` tiếp tục từ epoch kế tiếp; các run đã hoàn tất không bị train lại.

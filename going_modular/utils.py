@@ -94,8 +94,38 @@ def get_env_info(device: torch.device) -> Dict[str, str]:
     return info
 
 
+def ensure_compatible_state_dict(
+    state_dict: dict, arch: str | None = None, source_path: str | None = None
+) -> None:
+    """Từ chối checkpoint/state_dict format cũ (wrapper backbone/head) theo hướng B.
+
+    Không migrate key. Yêu cầu train lại 3 run với format native torchvision.
+    """
+    keys = list(state_dict.keys()) if isinstance(state_dict, dict) else []
+    has_legacy = any(
+        isinstance(k, str) and (k.startswith("backbone.") or k.startswith("head."))
+        for k in keys
+    )
+    if not has_legacy:
+        return
+
+    arch_hint = ""
+    if arch == "resnet18":
+        arch_hint = " (mong đợi key native như conv1.*, layer*, fc.*)"
+    elif arch == "vgg16":
+        arch_hint = " (mong đợi key native như features.*, classifier.*)"
+
+    src = f" từ '{source_path}'" if source_path else ""
+    raise ValueError(
+        "Checkpoint/state_dict không tương thích với format model native hiện tại"
+        f"{src}{arch_hint}: phát hiện key kiểu cũ 'backbone.*'/'head.*' (wrapper). "
+        "Không hỗ trợ migrate. Hãy đặt FORCE_RETRAIN=True hoặc dọn artifacts của run "
+        "(v0_vgg16, v1_resnet18, v1_resnet18_finetune) rồi train lại theo format mới."
+    )
+
+
 def load_model(
-    model: torch.nn.Module, model_path: str, device: str = "cpu"
+    model: torch.nn.Module, model_path: str, device: str = "cpu", arch: str | None = None
 ) -> torch.nn.Module:
     """Loads a saved state_dict into an existing model instance.
 
@@ -103,6 +133,7 @@ def load_model(
     loading if the payload is incompatible.
     """
     state_dict = torch.load(f=model_path, map_location=device, weights_only=True)
+    ensure_compatible_state_dict(state_dict, arch=arch, source_path=model_path)
     model.load_state_dict(state_dict)
     return model.to(device)
 
@@ -406,6 +437,7 @@ def load_checkpoint(
     optimizer: torch.optim.Optimizer,
     device: torch.device,
     expected_phase_config: Dict[str, object],
+    arch: str | None = None,
 ) -> Tuple[int, float, int, Dict[str, List[float]]]:
     """Load a resume checkpoint and verify phase config compatibility.
 
@@ -427,7 +459,9 @@ def load_checkpoint(
             "run configuration. Resume refused."
         )
 
-    model.load_state_dict(payload["model_state_dict"])
+    model_state = payload["model_state_dict"]
+    ensure_compatible_state_dict(model_state, arch=arch, source_path=str(checkpoint_path))
+    model.load_state_dict(model_state)
     optimizer.load_state_dict(payload["optimizer_state_dict"])
 
     return (

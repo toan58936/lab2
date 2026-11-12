@@ -1,8 +1,9 @@
 # Checklist trạng thái Notebook — `notebooks/pretrained_models.ipynb`
 
-> **Ngày rà soát:** 2026-11-11 (cập nhật sau refactor multi-run)  
+> **Ngày rà soát:** 2026-11-11 (cập nhật sau hướng B: native torchvision model/state_dict)  
 > **Phạm vi:** Đối chiếu notebook hiện tại với yêu cầu gốc (`docs/yeucaugoc.md`) và thiết kế (`docs/define&designt/00_lab2_description.md`, `docs/plans/*`).  
-> **Mô hình chạy:** Hỗ trợ 1 hoặc nhiều `RUN_ID` chạy tuần tự trong một phiên. Danh sách run: `v0_vgg16`, `v1_resnet18` (feature extraction), `v1_resnet18_finetune` (run fine-tune duy nhất).
+> **Mô hình chạy:** Hỗ trợ 1 hoặc nhiều `RUN_ID` chạy tuần tự trong một phiên. **Run hiện hành:** `v0_vgg16`, `v1_resnet18` (feature extraction), `v1_resnet18_finetune` (run fine-tune duy nhất).  
+> **Lưu ý hướng B:** model torchvision native (G1 VGG16 `classifier[6]`, ResNet `fc`), state_dict key gốc, không wrapper `MyModel`; artifacts/checkpoint cũ (`backbone.*`/`head.*`) không tương thích → cần `FORCE_RETRAIN`/dọn artifacts 3 run và train lại (fine-tune sau baseline mới).
 
 ## 1. Quy trình đã triển khai
 
@@ -10,7 +11,7 @@
 - [x] Mount Google Drive trên Colab (Cell 1, Cell 3).
 - [x] Xác định môi trường Colab/local, clone/pin code từ GitHub, thiết lập `CODE_ROOT`, `DATA_DIR`, `ARTIFACT_ROOT`, `RUNS_ROOT` (Cell 3).
 - [x] Cài `torchinfo`, import torch/torchvision/tensorboard, import `going_modular` và lấy `DEVICE` (Cell 4).
-- [x] Cấu hình `RUN_ID`/`RUN_IDS` (đơn/list/chuỗi phân tách dấu phẩy), `RUN_SPECS` 6 run, và **hành động do người dùng chọn** qua `RUN_PLAN`/`DEFAULT_RUN_ACTION` (`train` | `resume` | `reuse`) + `FORCE_RETRAIN` (Cell 5, có ghi chú `#` hướng dẫn). Code không tự suy luận trạng thái.
+- [x] Cấu hình `RUN_ID`/`RUN_IDS` (đơn/list/chuỗi phân tách dấu phẩy), `RUN_SPECS` 3 run hiện hành, và **hành động do người dùng chọn** qua `RUN_PLAN`/`DEFAULT_RUN_ACTION` (`train` | `resume` | `reuse`) + `FORCE_RETRAIN` (Cell 5, có ghi chú `#` hướng dẫn). Code không tự suy luận trạng thái.
 - [x] Validate run/action và thứ tự phụ thuộc fine-tune; tạo output/log; lưu kết quả trong `run_results`.
 
 ### 1. Dữ liệu CIFAR-10
@@ -19,9 +20,9 @@
 - [x] Kiểm tra batch shape/dtype/pixel range cho run đầu tiên (Cell 8).
 
 ### 2. Kiến trúc & mô hình
-- [x] Hiển thị `torchinfo.summary` cho **cả ResNet-18 và VGG16** (`depth=3`), sau đó dựng model per-run bằng `ModelConfig` + `build_model` (Cell 11).
-- [x] Fine-tune: nạp `best_model.pth` của baseline `v1_resnet18` vào model trước khi train khi run có dependency (Cell 11).
-- [x] Kiểm tra output shape `[B, NUM_CLASSES]`, in `model_selected.head`.
+- [x] Hiển thị `torchinfo.summary` cho **cả ResNet-18 và VGG16** (`depth=3`, model native), sau đó dựng model per-run bằng `ModelConfig` + `build_model` (Cell 11); hiển thị head native (`model.fc` / `model.classifier[6]`).
+- [x] Fine-tune: nạp `best_model.pth` của baseline `v1_resnet18` (format native) vào model trước khi train khi run có dependency (Cell 11).
+- [x] Kiểm tra output shape `[B, NUM_CLASSES]`/kiến trúc qua `torchinfo` và head native. Load/reuse truyền `arch` và bị guard từ chối format cũ.
 
 ### 3. Huấn luyện / Resume / Reuse (tuần tự, theo action người dùng chọn)
 - [x] Lặp qua `RUN_ID_LIST`: resolve action/spec/paths, kiểm tra artifacts theo action, tạo dataloader/model/optimizer/writer per-run (Cell 16).

@@ -174,12 +174,12 @@ def test_e6_bn_frozen_running_mean_unchanged():
     loss_fn = nn.CrossEntropyLoss()
     optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=1e-3)
 
-    before = model.backbone.bn1.running_mean.clone()
+    before = model.bn1.running_mean.clone()
     train_step(model, loader_big, loss_fn, optimizer, torch.device("cpu"),
                train_mode_fn=lambda m: set_train_mode(m, cfg))
 
     assert model.training is True
-    assert torch.equal(before, model.backbone.bn1.running_mean), "BN đóng băng không được thay đổi running_mean"
+    assert torch.equal(before, model.bn1.running_mean), "BN đóng băng không được thay đổi running_mean"
 
 
 # ---------------------------------------------------------------------------

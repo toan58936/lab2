@@ -37,7 +37,6 @@ def test_contract_13_exports():
         "ModelConfig",
         "build_model",
         "count_params",
-        "MyModel",
         "set_train_mode",
         "get_param_groups",
         "create_train_val_test_dataloaders",

@@ -2,69 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
+
 import torch
 from torch import nn
 from torchvision import models
-from torchvision.models import VGG16_Weights, ResNet18_Weights
-
-
-# ---------------------------------------------------------------------------
-# Wrapper model: backbone torchvision + head tùy chỉnh
-# ---------------------------------------------------------------------------
-
-class MyModel(nn.Module):
-
-
-    def __init__(
-        self,
-        arch: str,
-        num_classes: int,
-        weights: str | None = "IMAGENET1K_V1",
-        freeze_backbone: bool = True,
-        dropout: float = 0.0,
-        freeze_bn_stats: bool = True,
-    ):
-        super().__init__()
-        self.arch = arch
-        self.num_classes = num_classes
-        self.freeze_bn_stats = freeze_bn_stats
-
-        # --- Nạp backbone torchvision ---
-        if arch == "resnet18":
-            backbone = models.resnet18(weights=_resolve_weights(arch, weights))
-            in_features = backbone.fc.in_features
-            backbone.fc = nn.Identity()  # bỏ lớp gốc 1000 lớp
-        elif arch == "vgg16":
-            backbone = models.vgg16(weights=_resolve_weights(arch, weights))
-            # Tính output dim của backbone sau features+avgpool+flatten (trước classifier)
-            with torch.no_grad():
-                _dummy = torch.randn(1, 3, 224, 224)
-                _feat = backbone.features(_dummy)
-                _feat = backbone.avgpool(_feat)
-                _feat = torch.flatten(_feat, 1)
-                in_features = int(_feat.shape[1])
-            backbone.classifier = nn.Identity()  # bỏ lớp gốc 1000 lớp
-        else:
-            raise ValueError(f"Kiến trúc không hỗ trợ: '{arch}'.")
-
-        self.backbone = backbone
-
-        # --- Head mới (luôn trainable) ---
-        if dropout > 0:
-            self.head = nn.Sequential(
-                nn.Dropout(dropout),
-                nn.Linear(in_features, num_classes),
-            )
-        else:
-            self.head = nn.Linear(in_features, num_classes)
-
-        # --- Đóng băng backbone nếu yêu cầu ---
-        if freeze_backbone:
-            for param in self.backbone.parameters():
-                param.requires_grad = False
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.head(self.backbone(x))
+from torchvision.models import ResNet18_Weights, VGG16_Weights
 
 
 # ---------------------------------------------------------------------------
@@ -73,8 +15,6 @@ class MyModel(nn.Module):
 
 @dataclass(frozen=True)
 class ModelConfig:
-
-    
     arch: str = "resnet18"
     num_classes: int = 10
     weights: str | None = "IMAGENET1K_V1"
@@ -100,14 +40,14 @@ class ModelConfig:
 
 
 # ---------------------------------------------------------------------------
-# Architecture registry (dành cho get_param_groups / unfreeze_last_n)
+# Architecture helpers / registry (native torchvision models)
 # ---------------------------------------------------------------------------
 
 def _vgg16_conv_blocks(model: nn.Module) -> list[nn.Sequential]:
-    """Chia VGG16 backbone.features thành 5 khối conv, mỗi khối kết thúc bằng MaxPool2d."""
+    """Chia VGG16 features thành 5 khối conv, mỗi khối kết thúc bằng MaxPool2d."""
     blocks: list[nn.Sequential] = []
     current: list[nn.Module] = []
-    for module in model.backbone.features:
+    for module in model.features:
         current.append(module)
         if isinstance(module, nn.MaxPool2d):
             blocks.append(nn.Sequential(*current))
@@ -115,16 +55,25 @@ def _vgg16_conv_blocks(model: nn.Module) -> list[nn.Sequential]:
     return blocks
 
 
+def _head_param_ids(model: nn.Module, cfg: ModelConfig) -> set[int]:
+    """Trả về id tham số của head native (fc hoặc classifier[6])."""
+    if hasattr(model, "fc"):
+        head = model.fc
+    elif hasattr(model, "classifier") and isinstance(model.classifier, nn.Sequential) and len(model.classifier) > 6:
+        head = model.classifier[6]
+    elif hasattr(model, "classifier"):
+        head = model.classifier
+    else:
+        raise AttributeError("Không xác định được head của mô hình.")
+    return {id(p) for p in head.parameters()}
+
+
 ARCH_SPECS: dict[str, dict] = {
     "resnet18": {
-        "get_head": lambda m: m.head,
-        "set_head": lambda m, h: setattr(m, "head", h),
-        "blocks": lambda m: [m.backbone.layer1, m.backbone.layer2, m.backbone.layer3, m.backbone.layer4],
+        "blocks": lambda m: [m.layer1, m.layer2, m.layer3, m.layer4],
         "num_blocks": 4,
     },
     "vgg16": {
-        "get_head": lambda m: m.head,
-        "set_head": lambda m, h: setattr(m, "head", h),
         "blocks": _vgg16_conv_blocks,
         "num_blocks": 5,
     },
@@ -181,24 +130,53 @@ def _validate(cfg: ModelConfig) -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_model (new API)
+# build_model
 # ---------------------------------------------------------------------------
 
-def build_model(cfg: ModelConfig) -> nn.Module:
-    """Xây dựng MyModel từ ModelConfig (wrapper quanh torchvision backbone).
+def _create_native_model(arch: str, weights_name: str | None) -> nn.Module:
+    resolved = _resolve_weights(arch, weights_name)
+    if arch == "resnet18":
+        return models.resnet18(weights=resolved)
+    if arch == "vgg16":
+        return models.vgg16(weights=resolved)
+    raise ValueError(f"Kiến trúc không hỗ trợ: '{arch}'.")
 
-    Thứ tự: validate → nạp backbone → thay head → đóng băng backbone → unfreeze N khối cuối.
-    """
+
+def _replace_head(model: nn.Module, cfg: ModelConfig) -> None:
+    if cfg.arch == "resnet18":
+        in_features = model.fc.in_features
+        if cfg.dropout > 0:
+            model.fc = nn.Sequential(nn.Dropout(cfg.dropout), nn.Linear(in_features, cfg.num_classes))
+        else:
+            model.fc = nn.Linear(in_features, cfg.num_classes)
+        return
+
+    if cfg.arch == "vgg16":
+        # G1 (native, sát torchvision): giữ features/avgpool/classifier[0..5], chỉ thay classifier[6]
+        in_features = model.classifier[6].in_features
+        if cfg.dropout > 0:
+            model.classifier[6] = nn.Sequential(
+                nn.Dropout(cfg.dropout), nn.Linear(in_features, cfg.num_classes)
+            )
+        else:
+            model.classifier[6] = nn.Linear(in_features, cfg.num_classes)
+        return
+
+    raise ValueError(f"Kiến trúc không hỗ trợ: '{cfg.arch}'.")
+
+
+def build_model(cfg: ModelConfig) -> nn.Module:
+
     _validate(cfg)
 
-    model = MyModel(
-        arch=cfg.arch,
-        num_classes=cfg.num_classes,
-        weights=cfg.weights,
-        freeze_backbone=cfg.freeze_backbone,
-        dropout=cfg.dropout,
-        freeze_bn_stats=cfg.freeze_bn_stats,
-    )
+    model = _create_native_model(cfg.arch, cfg.weights)
+
+    # Đóng băng toàn bộ trước khi thay head để head mới luôn trainable.
+    if cfg.freeze_backbone:
+        for param in model.parameters():
+            param.requires_grad = False
+
+    _replace_head(model, cfg)
 
     # Mở khóa N khối cuối backbone (Fine-Tuning).
     if cfg.unfreeze_last_n > 0:
@@ -216,25 +194,19 @@ def build_model(cfg: ModelConfig) -> nn.Module:
 # ---------------------------------------------------------------------------
 
 def set_train_mode(model: nn.Module, cfg: ModelConfig) -> None:
-
     model.train()
     if cfg.freeze_bn_stats:
         for module in model.modules():
-            if isinstance(module, nn.BatchNorm2d):
-                all_frozen = all(
-                    not p.requires_grad for p in module.parameters(recurse=False)
-                )
-                if all_frozen:
+            if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+                # Nếu không có tham số affine/trainable, giữ eval để không cập nhật running stats
+                params = list(module.parameters(recurse=False))
+                if not params or all(not p.requires_grad for p in params):
                     module.eval()
 
 
 # ---------------------------------------------------------------------------
 # Parameter groups for optimizer
 # ---------------------------------------------------------------------------
-
-def _head_param_ids(model: nn.Module, cfg: ModelConfig) -> set[int]:
-    return {id(p) for p in model.head.parameters()}
-
 
 def get_param_groups(
     model: nn.Module,

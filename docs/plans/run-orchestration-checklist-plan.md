@@ -1,8 +1,10 @@
 # Kế hoạch: Notebook điều phối 1 hoặc nhiều RUN_ID (chạy tuần tự)
 
+> **Cập nhật 2026-11-11 (hướng B):** model/state_dict đã chuyển sang torchvision native (G1 VGG16 `classifier[6]`, ResNet `fc`, không wrapper `MyModel`). `train/resume/reuse`, engine/utils/eval và cấu trúc artifacts/outputs/logs giữ nguyên; cần guard format cũ + retrain 3 run khi chạy format mới. Notebook hiện dùng `RUN_PLAN`/`DEFAULT_RUN_ACTION`/`FORCE_RETRAIN` (không tự suy luận trạng thái).
+
 ## Mục tiêu và giới hạn
 
-Notebook điều phối chọn `RUN_ID` (đơn) hoặc `RUN_IDS` (danh sách, chạy tuần tự), chế độ `RUN_MODE` (`train`/`reuse`), `RESUME` và quản lý artifact (config/history/checkpoint/metrics theo `RUN_ID`). `going_modular/engine.py` phụ trách vòng lặp train/validation, chọn best model và cơ chế checkpoint/resume.
+Notebook điều phối chọn `RUN_ID` (đơn) hoặc `RUN_IDS` (danh sách, chạy tuần tự), chế độ/hành động per-run (`train`/`resume`/`reuse`) và quản lý artifact (config/history/checkpoint/metrics theo `RUN_ID`). `going_modular/engine.py` phụ trách vòng lặp train/validation, chọn best model và cơ chế checkpoint/resume.
 
 Ưu tiên dùng API engine hiện có. Không mở rộng engine thành bộ điều phối nhiều run; orchestration tuần tự nằm ở notebook.
 
@@ -11,7 +13,7 @@ Notebook điều phối chọn `RUN_ID` (đơn) hoặc `RUN_IDS` (danh sách, ch
 ### A. Chốt hợp đồng run và kiểm tra đầu vào
 
 - [x] `RUN_ID`/`RUN_IDS` resolve đúng các mục trong `RUN_SPECS` (hỗ trợ đơn, list, chuỗi phân tách dấu phẩy); kiểm tra đầy đủ 3 spec và dependency của fine-tune (`v1_resnet18_finetune` duy nhất).
-- [x] Quy định rõ `RUN_MODE=train|reuse` và `RESUME`: resume chỉ áp dụng cho train; báo lỗi sớm nếu mode, spec hoặc cấu hình không hợp lệ.
+- [x] Quy định rõ hành động `train|resume|reuse` (user-controlled qua `RUN_PLAN`/`DEFAULT_RUN_ACTION`, `FORCE_RETRAIN`): resume chỉ áp dụng khi có checkpoint dang dở; báo lỗi sớm nếu action, spec hoặc cấu hình không hợp lệ. Load/reuse/resume phải tương thích format native (guard từ chối `backbone.*`/`head.*`).
 - [x] Tạo cấu hình hiệu lực cho từng run được chọn (model/weights/freeze, epochs, batch size, learning rate/optimizer, param groups, seed, dependency); ghi cấu hình vào đúng thư mục run.
 - [x] Kiểm tra trạng thái artifact trước khi chạy từng run: train mới (có cơ chế dọn dẹp khi chạy lại), resume cần checkpoint, reuse cần đủ config/history/best checkpoint. Không tự chuyển reuse lỗi thành train.
 

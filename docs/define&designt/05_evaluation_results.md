@@ -1,3 +1,5 @@
+> **Cập nhật 2026-11-11 (hướng B):** model/state_dict native, run hiện hành `v0_vgg16`, `v1_resnet18`, `v1_resnet18_finetune` (3 run, artifacts/outputs/logs tách theo run). Các tham chiếu 6 thí nghiệm/v2 runs và ví dụ tham số trong tài liệu này là thiết kế/lịch sử so sánh; khi đánh giá sau retrain cần dùng kết quả của 3 run hiện hành.
+
 # Đặc tả Thiết kế Module Đánh giá & Phân tích Kết quả — `evaluate.py`
 
 > **Tài liệu:** `docs/define&designt/05_evaluation_results.md` (Define & Design cho bộ công cụ đánh giá và phân tích thực nghiệm)

@@ -1,3 +1,5 @@
+> **Cập nhật 2026-11-11 (hướng B, historical context):** checklist này phản ánh tích hợp giai đoạn trước refactor native. Hiện tại model là torchvision native (G1 VGG16 `classifier[6]`, ResNet `fc`), không còn wrapper `MyModel/backbone.head`, `state_dict` key gốc; hợp đồng flat export hiện hành 12 symbols; load/resume/reuse có guard từ chối format cũ và cần retrain 3 run. Rà soát/cập nhật khi dùng làm tham chiếu tiếp.
+
 # Phase 7 — Checklist tích hợp Notebook và package
 
 > **Điểm đến dự kiến:** `docs/plans/phase7.md`  
