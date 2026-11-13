@@ -13,11 +13,10 @@ from torchvision.models import ResNet18_Weights, VGG16_Weights
 # ---------------------------------------------------------------------------
 
 
-def get_pretrained_transform(
-    augment: bool = False,
+def _resolve_pretrained_weights(
     model_name: Literal["vgg16", "resnet18"] = "vgg16",
     weights_name: str = "IMAGENET1K_V1",
-) -> transforms.Compose:
+):
     if model_name == "vgg16":
         weights_enum = VGG16_Weights
     elif model_name == "resnet18":
@@ -26,13 +25,29 @@ def get_pretrained_transform(
         raise ValueError(
             f"Unknown model_name '{model_name}'. Choose 'vgg16' or 'resnet18'."
         )
-
     try:
-        weights = weights_enum[weights_name]
+        return weights_enum[weights_name]
     except (KeyError, AttributeError) as exc:
         raise ValueError(
             f"Unknown weights '{weights_name}' for model '{model_name}'."
         ) from exc
+
+
+def get_pretrained_mean_std(
+    model_name: Literal["vgg16", "resnet18"] = "vgg16",
+    weights_name: str = "IMAGENET1K_V1",
+) -> Tuple[Sequence[float], Sequence[float]]:
+    """Return (mean, std) for the pretrained transform preset."""
+    preset = _resolve_pretrained_weights(model_name, weights_name).transforms()
+    return preset.mean, preset.std
+
+
+def get_pretrained_transform(
+    augment: bool = False,
+    model_name: Literal["vgg16", "resnet18"] = "vgg16",
+    weights_name: str = "IMAGENET1K_V1",
+) -> transforms.Compose:
+    weights = _resolve_pretrained_weights(model_name, weights_name)
 
     base_ops = []
     if augment:

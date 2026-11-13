@@ -114,7 +114,7 @@ Tag TensorBoard: `Loss/train`, `Loss/val`, `Accuracy/train`, `Accuracy/val`, `LR
 | `evaluate_step(model, dataloader, loss_fn, device)` | như tên | `(loss, acc)`, model ở `eval` | `ValueError` nếu loader không có mẫu |
 | `train(model, train_dataloader, val_dataloader, optimizer, loss_fn, epochs, device, ...)` | xem mục 2 | `history` | `ValueError` (bên dưới) |
 
-`train` báo `ValueError` khi: `epochs <= 0`; `start_epoch < 0`; `monitor` không phải `val_acc` hoặc `val_loss`; `resume=True` mà thiếu `checkpoint_dir`; checkpoint đã hoàn tất đủ `epochs`. Checkpoint có phase config không khớp bị từ chối bởi `utils.load_checkpoint`.
+`train` báo `ValueError` khi: `epochs <= 0`; `start_epoch < 0`; `monitor` không phải `val_acc` hoặc `val_loss`; `resume=True` mà thiếu `checkpoint_dir`; checkpoint đã hoàn tất đủ `epochs`. Checkpoint có phase config không khớp hoặc state_dict format cũ (`backbone.*`/`head.*`, hướng B native không tương thích) bị từ chối bởi `utils.load_checkpoint`/guard.
 
 Lưu ý thứ tự tham số: `optimizer` đứng trước `loss_fn`.
 
@@ -124,7 +124,7 @@ Lưu ý thứ tự tham số: `optimizer` đứng trước `loss_fn`.
 | :--- | :--- |
 | Notebook | Dựng model, optimizer (từ `get_param_groups`), loader, writer; truyền `train_mode_fn=partial(set_train_mode, cfg=cfg)`; đóng writer sau khi xong |
 | `model_builder.py` | Cung cấp `set_train_mode` và nhóm tham số; engine không import module này |
-| `utils.py` | Engine gọi `save_model`, `save_checkpoint`, `load_checkpoint`, `save_history` |
+| `utils.py` | Engine gọi `save_model`, `save_checkpoint`, `save_history`; resume gọi `load_checkpoint(..., arch=expected_phase_config.get("arch"))` để khôi phục và từ chối checkpoint format cũ |
 | `evaluate.py` | Không dùng; engine chỉ làm việc với Train và Validation |
 
 ## 8. Tiêu chí chấp nhận
@@ -142,7 +142,7 @@ Lưu ý thứ tự tham số: `optimizer` đứng trước `loss_fn`.
 | Resume đúng epoch kế tiếp; config không khớp bị từ chối | FR-8 | E13 |
 | Tham số sai báo `ValueError` | FR-9 | E10 |
 
-Chi tiết từng test nằm trong `tests/03_test_engine.md`. Chạy: `pytest tests/test_engine.py -v`.
+Chi tiết từng test nằm trong `tests/test_engine.py`. Chạy: `pytest tests/test_engine.py -v`.
 
 ## 9. Ngoài phạm vi
 

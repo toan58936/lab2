@@ -1,3 +1,5 @@
+> **Cập nhật 2026-11-11 (hướng B):** chuẩn hóa/cấu hình notebook phải theo model native hiện hành (G1 VGG16 `classifier[6]`, ResNet `fc`, state_dict key gốc, bỏ `MyModel`). Chuyển format yêu cầu `FORCE_RETRAIN`/dọn artifacts và train lại `v0_vgg16`, `v1_resnet18`, `v1_resnet18_finetune`; `load_model/load_checkpoint` guard từ chối `backbone.*`/`head.*`. Các mục/đường dẫn tham chiếu run `v2_*` hoặc 6-run cũ trong tài liệu này là lịch sử, không thuộc danh mục run hiện hành.
+
 # Phase 8 — Chuẩn hóa cấu hình Notebook, GitHub và Google Drive
 
 ## Mục tiêu

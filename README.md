@@ -12,8 +12,10 @@ Dự án này tập trung vào thực hành ứng dụng các kiến trúc mạn
 
 | Mô hình | ID | Backbone Pretrained | Cơ chế huấn luyện | Ghi chú |
 |---|---|---|---|---|
-| **VGG16** | `v0` | `vgg16(weights='IMAGENET1K_V1')` | Feature Extraction (Đóng băng feature extractor, chỉ train classifier mới) | Kiến trúc CNN cổ điển sâu, nhiều tham số |
-| **ResNet-18** | `v1` | `resnet18(weights='IMAGENET1K_V1')` | Feature Extraction & Fine-tuning | Mạng Residual hiện đại, nhẹ, hội tụ nhanh |
+| **VGG16** | `v0` | `vgg16(weights='IMAGENET1K_V1')` | Feature Extraction (native torchvision, G1: đóng băng backbone, chỉ train `classifier[6]` 10 lớp) | Kiến trúc CNN cổ điển sâu; head 4096→10 (FE trainable 40,970) |
+| **ResNet-18** | `v1` | `resnet18(weights='IMAGENET1K_V1')` | Feature Extraction & Fine-tuning (native: `fc` 512→10) | Mạng Residual hiện đại, nhẹ, hội tụ nhanh |
+
+> **Hướng B (native, hiện hành):** `build_model` trả model torchvision đã adapt trực tiếp (không wrapper `MyModel`), `state_dict` dùng key gốc. Checkpoint/artifacts format cũ (`backbone.*`/`head.*`) **không tương thích** (không migrate). Khi chuyển sang format mới cần `FORCE_RETRAIN=True` hoặc dọn `artifacts/v0_vgg16,v1_resnet18,v1_resnet18_finetune` và train lại theo thứ tự `v0_vgg16` → `v1_resnet18` → `v1_resnet18_finetune`. `utils.load_model`/`load_checkpoint` sẽ báo lỗi rõ nếu phát hiện format cũ.
 
 ---
 
@@ -31,7 +33,7 @@ lab2/
 │   ├── model_builder.py               # Xây dựng và tùy biến mô hình Pre-trained
 │   ├── engine.py                      # Vòng lặp huấn luyện và kiểm định
 │   ├── evaluate.py                    # Confusion matrix, per-class accuracy, biểu đồ trực quan
-│   └── utils.py                       # seed, device, lưu/nạp checkpoint (.pth)
+│   └── utils.py                       # seed, device, lưu/nạp checkpoint (.pth), guard format native
 │
 ├── data/                              # Tự động tải CIFAR-10 (~170 MB) khi chạy lần đầu (không commit)
 ├── artifacts/                         # Kết quả sinh ra khi chạy (config/history/metrics commit, *.pth không commit)
@@ -160,33 +162,18 @@ FORCE_RETRAIN = False
 
 Mỗi run build/train/resume/reuse/đánh giá theo spec riêng, lưu artifacts vào `artifacts/<RUN_ID>/` và outputs vào `outputs/<date>/<RUN_ID>/<EVAL_ID>/`. Hiện có 3 run: `v0_vgg16`, `v1_resnet18` (feature extraction) và `v1_resnet18_finetune` (**run fine-tune duy nhất**). Fine-tune: train mới nạp `v1_resnet18/best_model.pth`; resume nạp checkpoint của chính run fine-tune. Test set chỉ dùng đánh giá cuối.
 
-Không commit dataset, TensorBoard logs hoặc checkpoint `.pth` lên GitHub. Config, history, metrics và hình kết quả được quản lý theo quy ước artifacts của dự án.
+Không commit dataset, TensorBoard logs hoặc checkpoint `.pth` lên GitHub. Config, history, metrics và hình kết quả được quản lý theo quy ước artifacts của dự án. **Lưu ý:** do chuyển sang state_dict native (hướng B), checkpoint/artifacts cũ không dùng được; cần retrain 3 run hiện hành khi chạy format mới.
 
 ### 4. Giám sát bằng TensorBoard
 
-Trong quá trình huấn luyện ở Section 4, quá trình học (Loss & Accuracy trên tập Train và Validation) sẽ được tự động ghi log vào thư mục `runs/`. Để mở giao diện trực quan:
+Trong quá trình huấn luyện, loss/accuracy (train/validation) được ghi log TensorBoard theo từng run/phiên (`logs/<RUN_ID>/<SESSION_ID>/`). Để mở giao diện trực quan:
 
 ```bash
-# Trong terminal (đã kích hoạt .venv):
-tensorboard --logdir=runs
+# Trong terminal (đã kích hoạt .venv), trỏ đến thư mục log phù hợp:
+tensorboard --logdir=logs
 ```
 
 Mở trình duyệt truy cập: [http://localhost:6006](http://localhost:6006)
-
----
-
-## 📖 Nội dung Chi tiết trong Notebook (`pretrained_models.ipynb`)
-
-Notebook được cấu trúc chặt chẽ thành **8 Section** tương ứng đầy đủ các bước của bài lab:
-
-1. **Section 0 — Setup & Config:** Tự động nhận diện đường dẫn `ROOT`, import thư viện và thiết lập inline hyperparameters (`SEED=42`, `BATCH_SIZE=32`, `LR=1e-3`, `EPOCHS=5`, `VAL_SIZE=5000`).
-2. **Section 1 — Load & Visualize Data:** Tải CIFAR-10, phân chia tập (45.000 train / 5.000 val / 10.000 test), kiểm tra kích thước và vẽ lưới ảnh minh họa kèm nhãn.
-3. **Section 2 — Khám phá kiến trúc Pre-trained:** Soi chi tiết cấu trúc mạng VGG16, ResNet-18 qua `torchinfo.summary()`; phân tích số lượng tham số tổng vs tham số trainable.
-4. **Section 3 — Kiểm tra model đã adapt:** Classifier 10 lớp được cấu hình trong `model_builder.py`; notebook xác nhận output shape `[2, 10]` và giải thích chiến lược đóng băng (freezing).
-5. **Section 4 — Train & Monitor với TensorBoard:** Huấn luyện `v0` (VGG16) và `v1` (ResNet-18) với `engine.train()`; chọn checkpoint tốt nhất theo validation accuracy, lưu weights/history/config vào `artifacts/`, log vào TensorBoard; hỗ trợ nạp lại bằng `RUN_MODE="reuse"`.
-6. **Section 5 — So sánh Models:** So sánh đường cong Loss/Accuracy qua các epoch, so sánh thời gian huấn luyện và hiệu quả hội tụ giữa VGG16 và ResNet-18.
-7. **Section 6 — Thử nghiệm Fine-tuning:** Mở đóng băng (unfreeze) một số block cuối của ResNet-18, huấn luyện bổ sung với learning rate nhỏ (`1e-4`) và so sánh đối chứng giữa Frozen vs Fine-tuned.
-8. **Section 7 — Đánh giá trên tập Test:** Đánh giá khách quan mô hình tốt nhất trên tập Test (10.000 ảnh chưa từng thấy); vẽ ma trận nhầm lẫn (**Confusion Matrix**), thống kê độ chính xác theo từng lớp (**Per-class Accuracy**) và tìm ra các cặp nhãn hay nhầm lẫn nhất.
 
 ---
 
@@ -210,7 +197,7 @@ Tiền xử lý được lấy trực tiếp từ weights tương ứng trong to
 | Hiện tượng | Nguyên nhân | Hướng khắc phục |
 |---|---|---|
 | `No module named 'going_modular'` | Kernel không nhận đúng thư mục cha | Section 0 trong notebook đã có cell tự động thêm `ROOT` vào `sys.path`. Đảm bảo đã chạy Section 0. |
-| Tải Pretrained Weights rất chậm | Trọng số mạng (đặc biệt là VGG16 ~528MB) lớn | Quá trình tải chỉ diễn ra một lần duy nhất (được cache tại thư mục `~/.cache/torch/hub/checkpoints`). Hãy kiên nhẫn đợi tải xong. |
+| Tải Pretrained Weights rất chậm | Trọng số mạng (đặc biệt là VGG16, checkpoint native G1 ~512MB) lớn | Quá trình tải chỉ diễn ra một lần duy nhất (được cache tại thư mục `~/.cache/torch/hub/checkpoints`). Hãy kiên nhẫn đợi tải xong. |
 | `CUDA out of memory` | Bộ nhớ GPU không đủ khi xử lý batch 224×224 | Giảm `BATCH_SIZE` xuống `16` trong cell cấu hình ở Section 0. |
 | Cảnh báo BatchNorm khi backbone bị freeze | PyTorch giữ eval mode cho BatchNorm | `set_train_mode(model, cfg)` trong `engine.py` giữ trạng thái `eval()` cho BatchNorm của phần đóng băng khi train. |
 ## Ghi chú tìm hiểu dự án

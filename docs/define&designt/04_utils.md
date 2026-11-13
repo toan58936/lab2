@@ -101,9 +101,9 @@ Notebook ── set_seed / get_device / get_env_info / create_writer
 
 1. Ghi nội dung vào file tạm cùng thư mục với file đích, flush/close, rồi thay thế nguyên tử bằng `os.replace`.
 2. Nếu quá trình ghi thất bại, giữ nguyên file đích cũ, dọn file tạm cụ thể đã tạo rồi phát lại lỗi.
-3. `save_model` chỉ lưu `model.state_dict()`; `load_model` ánh xạ thiết bị bằng `map_location`.
+3. `save_model` chỉ lưu `model.state_dict()` (native torchvision, key gốc). `load_model(model, path, device, arch=None)` ánh xạ thiết bị bằng `map_location`, gọi `ensure_compatible_state_dict(...)` để từ chối format cũ (`backbone.*`/`head.*`, không migrate), rồi nạp vào model.
 4. Nạp weights bằng `torch.load(..., weights_only=True)`; không hạ xuống `weights_only=False` khi gặp payload không hợp lệ.
-5. Resume checkpoint chỉ chứa state dict và các kiểu dữ liệu primitive/tensor tương thích với chế độ nạp an toàn. Optimizer state lưu dạng state dict, không lưu nguyên đối tượng optimizer, model hoặc callable.
+5. Resume checkpoint chỉ chứa state dict và các kiểu dữ liệu primitive/tensor tương thích với chế độ nạp an toàn. Optimizer state lưu dạng state dict, không lưu nguyên đối tượng optimizer, model hoặc callable. Khi nạp, `ensure_compatible_state_dict` kiểm tra format; checkpoint cũ wrapper không tương thích và yêu cầu train lại.
 6. JSON ghi UTF-8, `ensure_ascii=False`; validate schema history/config/test metrics ở biên load.
 7. `artifacts_exist` kiểm tra đủ `best_model.pth`, `history.json`, `config.json`; `test_metrics.json` là tùy chọn cho reuse inference.
 8. Resume checkpoint lưu phase config để từ chối tiếp tục nếu cấu hình run không khớp; checkpoint đánh dấu số epoch đã hoàn tất trong phase. Không lưu trạng thái RNG.
@@ -117,7 +117,8 @@ Notebook ── set_seed / get_device / get_env_info / create_writer
 | `get_env_info(device)` | `torch.device` | `dict[str, str]` | Lỗi runtime liên quan thiết bị được truyền |
 | `create_writer(experiment_name, log_root="runs")` | tên run và root | `SummaryWriter` | Lỗi I/O được truyền lên |
 | `save_model(model, path)` | model, đường dẫn | `Path` | Lỗi I/O được truyền lên |
-| `load_model(model, path, device)` | model, đường dẫn, device | model trên device | `FileNotFoundError`; lỗi state dict được truyền lên |
+| `ensure_compatible_state_dict(state_dict, arch=None, source_path=None)` | state_dict, arch tùy chọn | `None` | `ValueError` nếu phát hiện key legacy `backbone.*`/`head.*` (format cũ, không migrate) |
+| `load_model(model, path, device, arch=None)` | model, đường dẫn, device, arch tùy chọn | model trên device | `FileNotFoundError`; `ValueError` nếu format checkpoint cũ/không tương thích; lỗi state dict khác được truyền lên |
 | `save_experiment(artifact_dir, history, config)` | thư mục, history, config | đường dẫn file đã lưu | `ValueError` nếu schema không hợp lệ |
 | `save_config(artifact_dir, config)` | thư mục và config theo schema `00` | đường dẫn `config.json` | `ValueError` nếu schema không hợp lệ |
 | `save_history(artifact_dir, history)` | thư mục và sáu series history | đường dẫn `history.json` | `ValueError` nếu schema không hợp lệ |
@@ -126,7 +127,7 @@ Notebook ── set_seed / get_device / get_env_info / create_writer
 | `save_test_metrics(artifact_dir, metrics)` | thư mục, JSON record | đường dẫn file | `ValueError` nếu không serialize được |
 | `artifacts_exist(artifact_dir)` | thư mục | `bool` | Không nuốt lỗi truy cập file |
 | `save_checkpoint(path, model, optimizer, phase_epochs_completed, best_score, best_epoch, history, phase_config)` | trạng thái train của phase | `Path` | Lỗi I/O/schema được truyền lên |
-| `load_checkpoint(path, model, optimizer, device, expected_phase_config)` | file và trạng thái đích/config mong đợi | `phase_epochs_completed`, best score/epoch, history | `FileNotFoundError`/`ValueError` nếu payload hoặc config sai |
+| `load_checkpoint(path, model, optimizer, device, expected_phase_config, arch=None)` | file, trạng thái đích, device, config mong đợi, arch tùy chọn | `phase_epochs_completed`, best score/epoch, history | `FileNotFoundError`/`ValueError` nếu payload, config sai hoặc format state_dict cũ (`backbone.*`/`head.*`) |
 
 `save_experiment` chỉ là tiện ích ghi đồng thời config và history khi cần; luồng chuẩn không dùng hàm gộp này: Notebook gọi `save_config` trước train, engine gọi `save_history` sau từng epoch.
 
@@ -135,7 +136,7 @@ Notebook ── set_seed / get_device / get_env_info / create_writer
 | Module | Tương tác |
 | :--- | :--- |
 | `engine.py` | Dùng checkpoint save/load và gọi `save_history` sau mỗi epoch; không ghi config. |
-| `model_builder.py` | `utils` không dựng kiến trúc; Notebook dựng đúng cấu hình trước khi gọi `load_model`. |
+| `model_builder.py` | `utils` không dựng kiến trúc; Notebook dựng đúng cấu hình (native, weights/state đúng) trước khi gọi `load_model`/`load_checkpoint` (truyền `arch` khi có). |
 | `evaluate.py` | Tạo JSON record; gọi `save_test_metrics` để lưu. |
 | Notebook | Gọi seed/device/environment; ghi config trước train; điều phối `train`/`reuse`; nếu thiếu metrics thì đánh giá Test một lần; đóng writer; phát lỗi khi artifacts huấn luyện thiếu. |
 

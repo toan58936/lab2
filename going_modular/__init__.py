@@ -7,7 +7,7 @@ Import theo module (cách dùng trong notebook):
 Hoặc flat import (13 symbols theo hợp đồng 00_lab2_description.md mục 2.8.6):
     from going_modular import (
         ModelConfig, build_model, count_params,
-        MyModel, set_train_mode, get_param_groups,
+        set_train_mode, get_param_groups,
         create_train_val_test_dataloaders, train, evaluate_step,
         set_seed, get_device, run_inference, evaluate_predictions,
     )
@@ -22,7 +22,6 @@ from .data_setup import (
 from .model_builder import (
     build_model,
     count_params,
-    MyModel,
     get_param_groups,
     set_train_mode,
     ModelConfig,
@@ -79,6 +78,7 @@ from .utils import (
     make_eval_output_dir,
     make_session_log_dir,
     file_sha256,
+    ensure_compatible_state_dict,
 )
 
 __all__ = [
@@ -86,7 +86,6 @@ __all__ = [
     "ModelConfig",
     "build_model",
     "count_params",
-    "MyModel",
     "set_train_mode",
     "get_param_groups",
     "create_train_val_test_dataloaders",
