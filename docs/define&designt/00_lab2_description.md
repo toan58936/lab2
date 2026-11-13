@@ -55,7 +55,7 @@ Huấn luyện mạng nơ-ron sâu từ đầu cho phân loại ảnh tốn nhi�
 | FR-6 | Huấn luyện với loss, optimizer, chọn checkpoint tốt nhất theo Validation. | 6 |
 | FR-7 | Ghi loss, accuracy, learning rate lên TensorBoard. | 6 |
 | FR-8 | Đánh giá Test: accuracy, confusion matrix, accuracy theo lớp. | 7 |
-| FR-9 | Hai chế độ chạy: `train` và `reuse` (nạp kết quả đã lưu). | — |
+| FR-9 | Ba chế độ chạy: `train`, `resume` và `reuse`. | — |
 
 ### 4.2. Yêu cầu phi chức năng
 
@@ -108,7 +108,7 @@ Luồng: `Notebook → data_setup + model_builder → engine.train → artifacts
 | `seed` | 42 | |
 | `val_size` | 5000 | 10% của Train gốc |
 | `batch_size` | 32 | |
-| `epochs` (Feature Extraction) | 3 | Cấu hình thử nghiệm hiện tại (có thể tăng lên 5 theo thiết kế ban đầu) |
+| `epochs` (Feature Extraction) | 3 | Cấu hình thử nghiệm hiện tại (có thể tăng lên 5 khi chạy chính thức) |
 | `lr_head` | 1e-3 | Optimizer Adam |
 | `epochs` (Fine-Tuning) | 3 | Chạy tiếp từ baseline |
 | `lr_backbone` | 1e-4 | Chỉ áp dụng cho khối được mở khóa |
@@ -122,7 +122,7 @@ Luồng: `Notebook → data_setup + model_builder → engine.train → artifacts
 | `v1_resnet18` | ResNet-18 (native, thay `fc`) | Feature Extraction | 3 | 1e-3 / — | 32 | ImageNet (`IMAGENET1K_V1`) | **Baseline** |
 | `v1_resnet18_finetune` | ResNet-18 (native) | Fine-Tuning | 3 | 1e-3 / 1e-4 | 32 | `v1_resnet18` | Tác động của Fine-Tuning (run fine-tune duy nhất) |
 
-> **Ghi chú epochs:** Cấu hình hiện tại dùng 3 epoch để thử nghiệm nhanh; có thể tăng Feature Extraction lên 5 epoch (theo thiết kế ban đầu) khi chạy chính thức.
+> **Ghi chú epochs:** Cấu hình hiện tại dùng 3 epoch để thử nghiệm nhanh; có thể tăng Feature Extraction lên 5 epoch khi chạy chính thức.
 >
 > **Hướng B (native):** `build_model` trả về model torchvision đã adapt trực tiếp (không wrapper), `state_dict` dùng key gốc. Artifacts/checkpoint format cũ (`backbone.*`/`head.*`) không tương thích, không migrate; cần `FORCE_RETRAIN`/dọn artifacts 3 run và train lại theo format mới. Hợp đồng flat export hiện hành của `going_modular` gồm 12 symbols (không có `MyModel`): `ModelConfig, build_model, count_params, set_train_mode, get_param_groups, create_train_val_test_dataloaders, train, evaluate_step, set_seed, get_device, run_inference, evaluate_predictions`.
 

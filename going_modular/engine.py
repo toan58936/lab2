@@ -150,6 +150,7 @@ def train(
             optimizer,
             device_t,
             expected_phase_config or {},
+            arch=(expected_phase_config or {}).get("arch"),
         )
         if phase_epochs_completed >= epochs:
             raise ValueError(

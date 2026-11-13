@@ -142,7 +142,7 @@ Lưu ý thứ tự tham số: `optimizer` đứng trước `loss_fn`.
 | Resume đúng epoch kế tiếp; config không khớp bị từ chối | FR-8 | E13 |
 | Tham số sai báo `ValueError` | FR-9 | E10 |
 
-Chi tiết từng test nằm trong `tests/03_test_engine.md`. Chạy: `pytest tests/test_engine.py -v`.
+Chi tiết từng test nằm trong `tests/test_engine.py`. Chạy: `pytest tests/test_engine.py -v`.
 
 ## 9. Ngoài phạm vi
 

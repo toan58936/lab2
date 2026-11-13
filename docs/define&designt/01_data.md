@@ -28,7 +28,7 @@
 
 | | Mô tả |
 | :--- | :--- |
-| **Đầu vào** | `data_dir`, `batch_size`, `val_size`, `seed`, `num_workers`, `generator`, `train_transform`, `eval_transform`, `transform_model` |
+| **Đầu vào** | `data_dir`, `batch_size`, `val_size`, `seed`, `num_workers`, `generator`, `download`, `train_transform`, `eval_transform`, `transform_model`, `transform_weights` |
 | **Đầu ra** | `train_dl`, `val_dl`, `test_dl` (batch `[B, 3, 224, 224]`, `float32`) và `class_names` (10 tên lớp) |
 
 ## 4. Yêu cầu
@@ -96,19 +96,20 @@ Khi caller không truyền transform, dùng `get_pretrained_transform(augment, m
 
 | Hàm | Đầu vào | Đầu ra | Lỗi |
 | :--- | :--- | :--- | :--- |
-| `get_pretrained_transform(augment=False, model_name="vgg16")` | `bool`, `"vgg16"` hoặc `"resnet18"` | `transforms.Compose` | `ValueError` nếu `model_name` không hỗ trợ |
+| `get_pretrained_transform(augment=False, model_name="vgg16", weights_name="IMAGENET1K_V1")` | `bool`, `"vgg16"` hoặc `"resnet18"`, tên weights | `transforms.Compose` | `ValueError` nếu `model_name`/`weights_name` không hỗ trợ |
+| `get_pretrained_mean_std(model_name="vgg16", weights_name="IMAGENET1K_V1")` | tên kiến trúc, tên weights | `(mean, std)` | `ValueError` nếu không hỗ trợ |
 | `stratified_split_indices(labels, val_size, seed=42)` | nhãn, `int`, `int` | `(train_idx, val_idx)` là hai `list[int]` | `ValueError` (bên dưới) |
 | `create_train_val_test_dataloaders(...)` | xem mục 3 | 3 `DataLoader` và `class_names` | `ValueError` từ hàm con |
 
 `stratified_split_indices` báo `ValueError` khi: `val_size <= 0`; `val_size >= N`; có lớp ít hơn 2 mẫu; `val_size` không chừa ít nhất 1 mẫu Train cho mỗi lớp.
 
-Nếu `train_transform` hoặc `eval_transform` là `None`, factory tự dùng `get_pretrained_transform` tương ứng (`augment=True` cho Train, `False` cho Eval).
+Nếu `train_transform` hoặc `eval_transform` là `None`, factory tự dùng `get_pretrained_transform` tương ứng (`augment=True` cho Train, `False` cho Eval). `get_pretrained_mean_std` dùng để lấy thống kê chuẩn hóa của preset khi cần de-normalize ảnh (ví dụ hiển thị batch trong notebook).
 
 ## 8. Tích hợp
 
 | Bên dùng | Cách phối hợp |
 | :--- | :--- |
-| Notebook | Gọi `set_seed`, tạo `torch.Generator` riêng, tạo loader mới cho **mỗi** run; có thể truyền transform lấy từ `model_builder.get_transforms(...)`. |
+| Notebook | Gọi `set_seed`, tạo `torch.Generator` riêng, tạo loader mới cho **mỗi** run; truyền transform từ `data_setup.get_pretrained_transform(...)` và lấy `mean/std` từ `data_setup.get_pretrained_mean_std(...)`. |
 | `engine.py` | Train loader để huấn luyện; Validation loader để chọn checkpoint tốt nhất. |
 | `evaluate.py` | Test loader và `class_names` để suy luận và tính ma trận nhầm lẫn. |
 
