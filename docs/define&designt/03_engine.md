@@ -50,6 +50,8 @@ Sau epoch cuối: nếu `restore_best`, nạp lại trọng số tốt nhất v�
 | FR-7 | Lưu `last_checkpoint.pth` và `history.json` sau mỗi epoch; lỗi ghi phải dừng run, không bỏ qua. |
 | FR-8 | Resume tiếp tục từ epoch kế tiếp khi checkpoint khớp cấu hình; không khớp thì báo lỗi, không tự chạy lại từ đầu. |
 | FR-9 | Tham số sai báo `ValueError` rõ ràng. |
+| FR-10 | Early stopping: dừng sớm khi `monitor` không cải thiện nghiêm ngặt bằng `min_delta` trong `patience` epoch liên tiếp. |
+| FR-11 | LR scheduler: được gọi sau mỗi epoch với giá trị `monitor`; state scheduler lưu vào checkpoint để resume không reset LR. |
 
 ## 4. Ràng buộc
 
@@ -92,9 +94,19 @@ Tag TensorBoard: `Loss/train`, `Loss/val`, `Accuracy/train`, `Accuracy/val`, `LR
 ### 5.4. Resume
 
 1. Cần `checkpoint_dir` và `expected_phase_config`.
-2. Nạp `last_checkpoint.pth`: model, optimizer, số epoch đã hoàn tất, best score/epoch, history.
+2. Nạp `last_checkpoint.pth`: model, optimizer, số epoch đã hoàn tất, best score/epoch, history, early stopping state, scheduler state.
 3. Từ chối nếu phase config không khớp, hoặc số epoch đã hoàn tất không nhỏ hơn `epochs`.
-4. Tiếp tục từ epoch kế tiếp; history được nối tiếp.
+4. Tiếp tục từ epoch kế tiếp; history được nối tiếp. LR scheduler được khôi phục từ checkpoint.
+
+### 5.4a. Early Stopping
+
+Sau mỗi epoch, nếu giá trị `monitor` không cải thiện nghiêm ngặt hơn `best_score + min_delta` → tăng bộ đếm `bad_epochs`. Khi `bad_epochs >= patience` → dừng vòng lặp sớm, in thông báo. Nếu `restore_best=True` → nạp lại trọng số tốt nhất từ `best_model.pth` vào model trước khi trả về.
+
+Trạng thái early stopping (`bad_epochs`, `best_epoch`, `stopped_early`) được lưu vào `last_checkpoint.pth` để resume không bị mất tiến độ.
+
+### 5.4b. LR Scheduler
+
+`train(...)` nhận tham số `scheduler` (ví dụ `torch.optim.lr_scheduler.ReduceLROnPlateau`). Sau mỗi epoch, gọi `scheduler.step(current)` với `current` là giá trị `monitor` (`val_acc` hoặc `val_loss`). State scheduler được lưu vào `last_checkpoint.pth` và khôi phục khi `resume=True` để LR không bị reset về giá trị ban đầu.
 
 ### 5.5. Quyết định thiết kế
 
@@ -116,13 +128,15 @@ Tag TensorBoard: `Loss/train`, `Loss/val`, `Accuracy/train`, `Accuracy/val`, `LR
 
 `train` báo `ValueError` khi: `epochs <= 0`; `start_epoch < 0`; `monitor` không phải `val_acc` hoặc `val_loss`; `resume=True` mà thiếu `checkpoint_dir`; checkpoint đã hoàn tất đủ `epochs`. Checkpoint có phase config không khớp hoặc state_dict format cũ (`backbone.*`/`head.*`, hướng B native không tương thích) bị từ chối bởi `utils.load_checkpoint`/guard.
 
+`patience <= 0` hoặc `min_delta < 0` cũng báo `ValueError`.
+
 Lưu ý thứ tự tham số: `optimizer` đứng trước `loss_fn`.
 
 ## 7. Tích hợp
 
 | Bên dùng | Cách phối hợp |
 | :--- | :--- |
-| Notebook | Dựng model, optimizer (từ `get_param_groups`), loader, writer; truyền `train_mode_fn=partial(set_train_mode, cfg=cfg)`; đóng writer sau khi xong |
+| Notebook | Dựng model, optimizer (từ `get_param_groups`), loader, writer; truyền `train_mode_fn=partial(set_train_mode, cfg=cfg)`; truyền `scheduler` nếu muốn giảm LR khi stall; đóng writer sau khi xong |
 | `model_builder.py` | Cung cấp `set_train_mode` và nhóm tham số; engine không import module này |
 | `utils.py` | Engine gọi `save_model`, `save_checkpoint`, `save_history`; resume gọi `load_checkpoint(..., arch=expected_phase_config.get("arch"))` để khôi phục và từ chối checkpoint format cũ |
 | `evaluate.py` | Không dùng; engine chỉ làm việc với Train và Validation |
@@ -141,6 +155,10 @@ Lưu ý thứ tự tham số: `optimizer` đứng trước `loss_fn`.
 | Checkpoint và history ghi nguyên tử; lỗi ghi không làm hỏng file cũ | FR-7 | E14 |
 | Resume đúng epoch kế tiếp; config không khớp bị từ chối | FR-8 | E13 |
 | Tham số sai báo `ValueError` | FR-9 | E10 |
+| Early stopping dừng trước khi hết `epochs` | FR-10 | M1 |
+| Scheduler giảm LR khi `monitor` stall | FR-11 | M2 |
+| Checkpoint lưu/khôi phục scheduler state khi resume | FR-11 | M3 |
+| Checkpoint lưu/khôi phục early stopping state khi resume | FR-10 | M4 |
 
 Chi tiết từng test nằm trong `tests/test_engine.py`. Chạy: `pytest tests/test_engine.py -v`.
 

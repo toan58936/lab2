@@ -29,12 +29,7 @@ def train_step(
     device: torch.device | str,
     train_mode_fn: Optional[Callable[[nn.Module], None]] = None,
 ) -> Tuple[float, float]:
-    """One training epoch. Returns (sample-weighted loss, accuracy).
 
-    If ``train_mode_fn`` is supplied it is called once at the start to put
-    the model in train mode (e.g. ``functools.partial(set_train_mode, cfg=...)``
-    which keeps frozen BatchNorm in eval). Otherwise ``model.train()`` is used.
-    """
     if train_mode_fn is not None:
         train_mode_fn(model)
     else:
@@ -112,12 +107,19 @@ def train(
     checkpoint_dir: Optional[str] = None,
     resume: bool = False,
     expected_phase_config: Optional[Dict[str, Any]] = None,
+    scheduler: Optional[object] = None,
+    patience: int = 5,
+    min_delta: float = 1e-4,
     verbose: bool = True,
 ) -> Dict[str, List]:
     """Multi-epoch training loop with best-checkpoint selection and resume.
 
     History keys: train_loss, val_loss, train_acc, val_acc, lr, epoch_time.
     Each key holds one entry per completed epoch.
+
+    Early stopping stops the loop when ``monitor`` does not improve strictly
+    by ``min_delta`` for ``patience`` consecutive epochs. ``scheduler`` is
+    stepped each epoch with the monitored value.
     """
     # ---- Validate inputs --------------------------------------------------
     if epochs <= 0:
@@ -140,23 +142,36 @@ def train(
         "lr": [], "epoch_time": [],
     }
 
+    bad_epochs = 0
+    stopped_early = False
+
     if resume:
         if checkpoint_dir is None:
             raise ValueError("resume=True requires checkpoint_dir.")
         ckpt_path = Path(checkpoint_dir) / "last_checkpoint.pth"
-        phase_epochs_completed, best_score, best_epoch, history = utils.load_checkpoint(
+        (
+            phase_epochs_completed,
+            best_score,
+            best_epoch,
+            history,
+            early_stopping_state,
+        ) = utils.load_checkpoint(
             str(ckpt_path),
             model,
             optimizer,
             device_t,
             expected_phase_config or {},
             arch=(expected_phase_config or {}).get("arch"),
+            scheduler=scheduler,
         )
         if phase_epochs_completed >= epochs:
             raise ValueError(
                 f"Checkpoint already completed {phase_epochs_completed} epochs "
                 f">= requested {epochs}. Nothing to resume."
             )
+        if early_stopping_state is not None:
+            bad_epochs = int(early_stopping_state.get("bad_epochs", 0))
+            stopped_early = bool(early_stopping_state.get("stopped_early", False))
     else:
         best_score: float | None = None
         best_epoch: int | None = None
@@ -221,16 +236,38 @@ def train(
         if improved:
             best_score = current
             best_epoch = phase_epoch
+            bad_epochs = 0
             if save_path is not None:
                 save_p = Path(save_path)
                 save_p.parent.mkdir(parents=True, exist_ok=True)
                 utils.save_model(model, str(save_p))
+        else:
+            bad_epochs += 1
+
+        # Step LR scheduler with the monitored value
+        if scheduler is not None:
+            scheduler.step(current)
+
+        # Early stopping: stop if monitor did not improve for `patience` epochs
+        if bad_epochs >= patience:
+            stopped_early = True
+            print(f"  [EarlyStopping] dừng sớm tại epoch {phase_epoch + 1}/{epochs} "
+                  f"(không cải thiện {patience} epochs).")
+            break
 
         # Checkpoint + history persistence (atomic via utils)
         if checkpoint_dir is not None:
             ckpt_dir = Path(checkpoint_dir)
             ckpt_dir.mkdir(parents=True, exist_ok=True)
             phase_config = expected_phase_config or {}
+            scheduler_state_dict = (
+                scheduler.state_dict() if scheduler is not None else None
+            )
+            early_stopping_state = {
+                "bad_epochs": bad_epochs,
+                "best_epoch": best_epoch if best_epoch is not None else phase_epoch,
+                "stopped_early": stopped_early,
+            }
             utils.save_checkpoint(
                 str(ckpt_dir / "last_checkpoint.pth"),
                 model,
@@ -240,6 +277,8 @@ def train(
                 best_epoch=best_epoch if best_epoch is not None else phase_epoch,
                 history=history,
                 phase_config=phase_config,
+                scheduler_state_dict=scheduler_state_dict,
+                early_stopping_state=early_stopping_state,
             )
             utils.save_history(str(ckpt_dir), history)
 

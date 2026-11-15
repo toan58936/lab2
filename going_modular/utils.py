@@ -401,6 +401,8 @@ def save_checkpoint(
     best_epoch: int,
     history: Dict[str, List[float]],
     phase_config: Dict[str, object],
+    scheduler_state_dict: Optional[Dict[str, object]] = None,
+    early_stopping_state: Optional[Dict[str, object]] = None,
 ) -> Path:
     """Save a resume checkpoint containing model, optimizer, epoch, score and history.
 
@@ -420,6 +422,10 @@ def save_checkpoint(
         "history": history,
         "phase_config": phase_config,
     }
+    if scheduler_state_dict is not None:
+        payload["scheduler_state_dict"] = scheduler_state_dict
+    if early_stopping_state is not None:
+        payload["early_stopping_state"] = early_stopping_state
     tmp_path = checkpoint_path.with_suffix(checkpoint_path.suffix + ".tmp")
     try:
         torch.save(payload, tmp_path)
@@ -438,10 +444,14 @@ def load_checkpoint(
     device: torch.device,
     expected_phase_config: Dict[str, object],
     arch: str | None = None,
-) -> Tuple[int, float, int, Dict[str, List[float]]]:
+    scheduler: Optional[object] = None,
+) -> Tuple[int, float, int, Dict[str, List[float]], Optional[Dict[str, object]]]:
     """Load a resume checkpoint and verify phase config compatibility.
 
-    Returns ``(phase_epochs_completed, best_score, best_epoch, history)``.
+    Returns ``(phase_epochs_completed, best_score, best_epoch, history,
+    early_stopping_state)``. ``early_stopping_state`` is a dict with keys
+    ``bad_epochs``, ``best_epoch``, ``stopped_early`` or ``None`` if the
+    checkpoint was saved without early stopping info.
 
     Raises ``FileNotFoundError`` if the checkpoint is missing and
     ``ValueError`` if the phase config does not match.
@@ -464,9 +474,17 @@ def load_checkpoint(
     model.load_state_dict(model_state)
     optimizer.load_state_dict(payload["optimizer_state_dict"])
 
+    scheduler_state = None
+    if scheduler is not None and "scheduler_state_dict" in payload:
+        scheduler.load_state_dict(payload["scheduler_state_dict"])
+        scheduler_state = payload["scheduler_state_dict"]
+
+    early_stopping_state = payload.get("early_stopping_state")
+
     return (
         payload["phase_epochs_completed"],
         payload["best_score"],
         payload["best_epoch"],
         payload["history"],
+        early_stopping_state,
     )

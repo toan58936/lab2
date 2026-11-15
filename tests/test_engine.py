@@ -528,3 +528,180 @@ def test_train_mode_fn_keeps_backbone_eval(tmp_path):
           verbose=False)
 
     assert backbone.training is False
+
+
+# ---------------------------------------------------------------------------
+# Nhóm M: Early stopping & LR scheduler (M1–M4)
+# ---------------------------------------------------------------------------
+
+def test_m1_early_stopping_stops_before_epochs(tmp_path):
+    """M1: val_acc không cải thiện patience epochs → dừng sớm, history ngắn hơn epochs."""
+    model = make_toy_model()
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.0)
+    train_dl = make_toy_loader(n_samples=20, batch_size=5)
+    val_dl = make_toy_loader(n_samples=10, batch_size=5, seed=1)
+
+    # val_acc constant → không cải thiện → early stopping ở epoch patience+1
+    val_accs = iter([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+
+    def fake_eval(m, dl, lf, dev):
+        return 0.1, next(val_accs)
+
+    engine.train_step = train_step
+    engine.evaluate_step = fake_eval
+    try:
+        history = train(model, train_dl, val_dl, optimizer, loss_fn,
+                        epochs=10, device=torch.device("cpu"),
+                        patience=2, min_delta=0.0, verbose=False)
+    finally:
+        engine.train_step = train_step
+        engine.evaluate_step = evaluate_step
+
+    # Đã dừng sớm: không chạy hết 10 epochs
+    assert len(history["train_loss"]) < 10
+    # Với patience=2: epoch 1 cải thiện (best), epoch 2-3 không cải thiện (bad=2) → dừng ở epoch 3
+    assert len(history["train_loss"]) == 3
+
+
+def test_m2_scheduler_reduces_lr_on_plateau(tmp_path):
+    """M2: ReduceLROnPlateau giảm LR khi val_acc không cải thiện."""
+    model = make_toy_model()
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.1)
+    train_dl = make_toy_loader(n_samples=20, batch_size=5)
+    val_dl = make_toy_loader(n_samples=10, batch_size=5, seed=1)
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="max", factor=0.1, patience=1, min_lr=1e-6
+    )
+
+    val_accs = iter([0.5, 0.5, 0.5, 0.5])
+
+    def fake_eval(m, dl, lf, dev):
+        return 0.1, next(val_accs)
+
+    engine.train_step = train_step
+    engine.evaluate_step = fake_eval
+    try:
+        history = train(model, train_dl, val_dl, optimizer, loss_fn,
+                        epochs=4, device=torch.device("cpu"),
+                        scheduler=scheduler, patience=10, verbose=False)
+    finally:
+        engine.train_step = train_step
+        engine.evaluate_step = evaluate_step
+
+    # LR đã bị giảm ít nhất 1 lần
+    assert optimizer.param_groups[0]["lr"] < 0.1
+
+
+def test_m3_checkpoint_saves_restores_scheduler_state(tmp_path):
+    """M3: Checkpoint lưu scheduler state; resume không reset LR."""
+    model = make_toy_model()
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.1)
+    train_dl = make_toy_loader(n_samples=20, batch_size=5)
+    val_dl = make_toy_loader(n_samples=10, batch_size=5, seed=1)
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="max", factor=0.5, patience=1, min_lr=1e-6
+    )
+    ckpt_dir = tmp_path / "artifacts_sched"
+    ckpt_dir.mkdir()
+
+    # Chạy 2 epoch để scheduler có thể giảm LR
+    val_accs = iter([0.5, 0.5])
+    def fake_eval(m, dl, lf, dev):
+        return 0.1, next(val_accs)
+
+    engine.train_step = train_step
+    engine.evaluate_step = fake_eval
+    try:
+        train(model, train_dl, val_dl, optimizer, loss_fn,
+              epochs=2, device=torch.device("cpu"),
+              scheduler=scheduler,
+              checkpoint_dir=str(ckpt_dir), verbose=False)
+    finally:
+        engine.train_step = train_step
+        engine.evaluate_step = evaluate_step
+
+    lr_after_phase1 = optimizer.param_groups[0]["lr"]
+
+    # Tạo model mới và resume với scheduler mới
+    model2 = make_toy_model()
+    optimizer2 = optim.SGD(model2.parameters(), lr=0.1)
+    scheduler2 = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer2, mode="max", factor=0.5, patience=1, min_lr=1e-6
+    )
+
+    engine.train_step = train_step
+    val_accs2 = iter([0.5, 0.5])
+
+    def fake_eval2(m, dl, lf, dev):
+        return 0.1, next(val_accs2)
+
+    engine.evaluate_step = fake_eval2
+    try:
+        train(model2, train_dl, val_dl, optimizer2, loss_fn,
+              epochs=3, device=torch.device("cpu"),
+              scheduler=scheduler2,
+              checkpoint_dir=str(ckpt_dir), resume=True, verbose=False)
+    finally:
+        engine.train_step = train_step
+        engine.evaluate_step = evaluate_step
+
+    # LR sau resume không bị reset về 0.1 (scheduler state được khôi phục)
+    assert optimizer2.param_groups[0]["lr"] != 0.1
+    assert optimizer2.param_groups[0]["lr"] <= lr_after_phase1
+
+
+def test_m4_checkpoint_saves_restores_early_stopping_state(tmp_path):
+    """M4: early stopping state lưu vào checkpoint; resume tiếp tục bad_epochs."""
+    model = make_toy_model()
+    loss_fn = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(model.parameters(), lr=0.0)
+    train_dl = make_toy_loader(n_samples=20, batch_size=5)
+    val_dl = make_toy_loader(n_samples=10, batch_size=5, seed=1)
+
+    ckpt_dir = tmp_path / "artifacts_es"
+    ckpt_dir.mkdir()
+
+    # val_acc constant → early stopping ở patience=2 (dừng epoch 3)
+    val_accs = iter([0.5, 0.5, 0.5, 0.5, 0.5])
+    def fake_eval(m, dl, lf, dev):
+        return 0.1, next(val_accs)
+
+    engine.train_step = train_step
+    engine.evaluate_step = fake_eval
+    try:
+        history1 = train(model, train_dl, val_dl, optimizer, loss_fn,
+                         epochs=10, device=torch.device("cpu"),
+                         patience=2, min_delta=0.0,
+                         checkpoint_dir=str(ckpt_dir), verbose=False)
+    finally:
+        engine.train_step = train_step
+        engine.evaluate_step = evaluate_step
+
+    assert len(history1["train_loss"]) == 3  # dừng sớm
+
+    # Resume với epochs lớn hơn: bad_epochs được khôi phục nên sẽ dừng ngay lập tức
+    model2 = make_toy_model()
+    optimizer2 = optim.SGD(model2.parameters(), lr=0.0)
+    val_accs2 = iter([0.5, 0.5])
+    def fake_eval2(m, dl, lf, dev):
+        return 0.1, next(val_accs2)
+
+    engine.train_step = train_step
+    engine.evaluate_step = fake_eval2
+    try:
+        history2 = train(model2, train_dl, val_dl, optimizer2, loss_fn,
+                         epochs=10, device=torch.device("cpu"),
+                         patience=2, min_delta=0.0,
+                         checkpoint_dir=str(ckpt_dir), resume=True, verbose=False)
+    finally:
+        engine.train_step = train_step
+        engine.evaluate_step = evaluate_step
+
+    # Checkpoint lưu history 2 entry (epoch 0,1). Resume thêm 1 entry (epoch 2)
+    # rồi dừng sớm vì bad_epochs đã được khôi phục.
+    assert len(history2["train_loss"]) == 3
