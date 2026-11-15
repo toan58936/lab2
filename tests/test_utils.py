@@ -270,7 +270,7 @@ def test_u10_checkpoint_resume_roundtrip(tmp_path):
 
     model2 = TinyModel()
     optimizer2 = optim.SGD(model2.parameters(), lr=1e-3)
-    epochs, score, best_epoch, loaded_history = load_checkpoint(
+    epochs, score, best_epoch, loaded_history, es_state = load_checkpoint(
         str(ckpt_path), model2, optimizer2, device=torch.device("cpu"),
         expected_phase_config=phase_config,
     )
@@ -278,6 +278,7 @@ def test_u10_checkpoint_resume_roundtrip(tmp_path):
     assert score == 0.85
     assert best_epoch == 2
     assert loaded_history == history
+    assert es_state is None
 
 
 def test_u10_config_mismatch_refused(tmp_path):
