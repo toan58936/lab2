@@ -40,8 +40,43 @@ class ModelConfig:
 
 
 # ---------------------------------------------------------------------------
-# Architecture helpers / registry (native torchvision models)
+# Helpers
 # ---------------------------------------------------------------------------
+
+def _resolve_weights(arch: str, weights_name: str | None):
+    """Ánh xạ tên trọng số (str) thành torchvision WeightsEnum member."""
+    if weights_name is None:
+        return None
+    enum_cls = {"resnet18": ResNet18_Weights, "vgg16": VGG16_Weights}.get(arch)
+    if enum_cls is None:
+        raise ValueError(f"Không hỗ trợ kiến trúc '{arch}' để giải quyết trọng số.")
+    try:
+        return enum_cls[weights_name]
+    except (KeyError, AttributeError) as exc:
+        raise ValueError(
+            f"Không xác định được trọng số '{weights_name}' cho kiến trúc '{arch}'."
+        ) from exc
+
+
+def _validate(cfg: ModelConfig) -> None:
+    if cfg.arch not in ("resnet18", "vgg16"):
+        raise ValueError(f"Kiến trúc không hỗ trợ: '{cfg.arch}'. Hãy chọn 'resnet18' hoặc 'vgg16'.")
+    if cfg.unfreeze_last_n < 0:
+        raise ValueError(f"unfreeze_last_n không được âm (đã nhận {cfg.unfreeze_last_n}).")
+    if not (0.0 <= cfg.dropout < 1.0):
+        raise ValueError(f"dropout phải nằm trong [0, 1) (đã nhận {cfg.dropout}).")
+    max_blocks = 4 if cfg.arch == "resnet18" else 5
+    if cfg.unfreeze_last_n > max_blocks:
+        raise ValueError(
+            f"unfreeze_last_n={cfg.unfreeze_last_n} vượt quá số khối của "
+            f"'{cfg.arch}' ({max_blocks})."
+        )
+    if not cfg.freeze_backbone and cfg.unfreeze_last_n > 0:
+        raise ValueError(
+            "Không thể kết hợp freeze_backbone=False với unfreeze_last_n>0. "
+            "Dùng freeze_backbone=True, unfreeze_last_n=N cho Fine-Tuning."
+        )
+
 
 def _vgg16_conv_blocks(model: nn.Module) -> list[nn.Sequential]:
     """Chia VGG16 features thành 5 khối conv, mỗi khối kết thúc bằng MaxPool2d."""
@@ -55,19 +90,6 @@ def _vgg16_conv_blocks(model: nn.Module) -> list[nn.Sequential]:
     return blocks
 
 
-def _head_param_ids(model: nn.Module, cfg: ModelConfig) -> set[int]:
-    """Trả về id tham số của head native (fc hoặc classifier[6])."""
-    if hasattr(model, "fc"):
-        head = model.fc
-    elif hasattr(model, "classifier") and isinstance(model.classifier, nn.Sequential) and len(model.classifier) > 6:
-        head = model.classifier[6]
-    elif hasattr(model, "classifier"):
-        head = model.classifier
-    else:
-        raise AttributeError("Không xác định được head của mô hình.")
-    return {id(p) for p in head.parameters()}
-
-
 ARCH_SPECS: dict[str, dict] = {
     "resnet18": {
         "blocks": lambda m: [m.layer1, m.layer2, m.layer3, m.layer4],
@@ -79,97 +101,58 @@ ARCH_SPECS: dict[str, dict] = {
     },
 }
 
-_WEIGHT_ENUMS: dict[str, type] = {
-    "resnet18": ResNet18_Weights,
-    "vgg16": VGG16_Weights,
-}
+
+def _head_params(model: nn.Module, arch: str) -> list[nn.Parameter]:
+    """Trả về danh sách tham số của head native (fc hoặc classifier[6])."""
+    if arch == "resnet18":
+        return list(model.fc.parameters())
+    if hasattr(model, "classifier") and len(model.classifier) > 6:
+        return list(model.classifier[6].parameters())
+    if hasattr(model, "classifier"):
+        return list(model.classifier.parameters())
+    raise AttributeError("Không xác định được head của mô hình.")
 
 
-def _resolve_weights(arch: str, weights_name: str | None):
-    """Ánh xạ tên trọng số (str) thành torchvision WeightsEnum member."""
-    if weights_name is None:
-        return None
-    enum_cls = _WEIGHT_ENUMS.get(arch)
-    if enum_cls is None:
-        raise ValueError(f"Không hỗ trợ kiến trúc '{arch}' để giải quyết trọng số.")
-    try:
-        return enum_cls[weights_name]
-    except (KeyError, AttributeError) as exc:
-        raise ValueError(
-            f"Không xác định được trọng số '{weights_name}' cho kiến trúc '{arch}'."
-        ) from exc
+def _replace_head(model: nn.Module, cfg: ModelConfig) -> None:
+    """Thay lớp phân loại cuối (head) bằng head mới cho num_classes."""
+    if cfg.arch == "resnet18":
+        in_features = model.fc.in_features
+    else:
+        in_features = model.classifier[6].in_features
 
+    head: nn.Module
+    if cfg.dropout > 0:
+        head = nn.Sequential(nn.Dropout(cfg.dropout), nn.Linear(in_features, cfg.num_classes))
+    else:
+        head = nn.Linear(in_features, cfg.num_classes)
 
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
-
-def _validate(cfg: ModelConfig) -> None:
-    if cfg.arch not in ARCH_SPECS:
-        raise ValueError(
-            f"Kiến trúc không hỗ trợ: '{cfg.arch}'. "
-            f"Các kiến trúc hợp lệ: {sorted(ARCH_SPECS)}."
-        )
-    if cfg.unfreeze_last_n < 0:
-        raise ValueError(f"unfreeze_last_n không được âm (đã nhận {cfg.unfreeze_last_n}).")
-    if not (0.0 <= cfg.dropout < 1.0):
-        raise ValueError(
-            f"dropout phải nằm trong [0, 1) (đã nhận {cfg.dropout})."
-        )
-    num_blocks = ARCH_SPECS[cfg.arch]["num_blocks"]
-    if cfg.unfreeze_last_n > num_blocks:
-        raise ValueError(
-            f"unfreeze_last_n={cfg.unfreeze_last_n} vượt quá số khối của "
-            f"'{cfg.arch}' ({num_blocks})."
-        )
-    if not cfg.freeze_backbone and cfg.unfreeze_last_n > 0:
-        raise ValueError(
-            "Không thể kết hợp freeze_backbone=False với unfreeze_last_n>0. "
-            "Dùng freeze_backbone=True, unfreeze_last_n=N cho Fine-Tuning."
-        )
+    if cfg.arch == "resnet18":
+        model.fc = head
+    else:
+        model.classifier[6] = head
 
 
 # ---------------------------------------------------------------------------
 # build_model
 # ---------------------------------------------------------------------------
 
-def _create_native_model(arch: str, weights_name: str | None) -> nn.Module:
-    resolved = _resolve_weights(arch, weights_name)
-    if arch == "resnet18":
-        return models.resnet18(weights=resolved)
-    if arch == "vgg16":
-        return models.vgg16(weights=resolved)
-    raise ValueError(f"Kiến trúc không hỗ trợ: '{arch}'.")
-
-
-def _replace_head(model: nn.Module, cfg: ModelConfig) -> None:
-    if cfg.arch == "resnet18":
-        in_features = model.fc.in_features
-        if cfg.dropout > 0:
-            model.fc = nn.Sequential(nn.Dropout(cfg.dropout), nn.Linear(in_features, cfg.num_classes))
-        else:
-            model.fc = nn.Linear(in_features, cfg.num_classes)
-        return
-
-    if cfg.arch == "vgg16":
-        # G1 (native, sát torchvision): giữ features/avgpool/classifier[0..5], chỉ thay classifier[6]
-        in_features = model.classifier[6].in_features
-        if cfg.dropout > 0:
-            model.classifier[6] = nn.Sequential(
-                nn.Dropout(cfg.dropout), nn.Linear(in_features, cfg.num_classes)
-            )
-        else:
-            model.classifier[6] = nn.Linear(in_features, cfg.num_classes)
-        return
-
-    raise ValueError(f"Kiến trúc không hỗ trợ: '{cfg.arch}'.")
-
-
 def build_model(cfg: ModelConfig) -> nn.Module:
+    """Xây dựng mô hình torchvision native đã adapt cho CIFAR-10.
 
+    Luồng:
+      1. validate cfg
+      2. nạp model torchvision native (resnet18 / vgg16) với weights
+      3. nếu freeze_backbone: requires_grad=False cho toàn bộ tham số
+      4. thay head native: resnet18.fc / vgg16.classifier[6] (head mới luôn trainable)
+      5. nếu unfreeze_last_n > 0: mở khóa N khối cuối backbone
+    """
     _validate(cfg)
 
-    model = _create_native_model(cfg.arch, cfg.weights)
+    resolved = _resolve_weights(cfg.arch, cfg.weights)
+    if cfg.arch == "resnet18":
+        model = models.resnet18(weights=resolved)
+    else:
+        model = models.vgg16(weights=resolved)
 
     # Đóng băng toàn bộ trước khi thay head để head mới luôn trainable.
     if cfg.freeze_backbone:
@@ -180,8 +163,10 @@ def build_model(cfg: ModelConfig) -> nn.Module:
 
     # Mở khóa N khối cuối backbone (Fine-Tuning).
     if cfg.unfreeze_last_n > 0:
-        spec = ARCH_SPECS[cfg.arch]
-        blocks = spec["blocks"](model)
+        if cfg.arch == "resnet18":
+            blocks = [model.layer1, model.layer2, model.layer3, model.layer4]
+        else:
+            blocks = _vgg16_conv_blocks(model)
         for block in blocks[-cfg.unfreeze_last_n:]:
             for param in block.parameters():
                 param.requires_grad = True
@@ -194,11 +179,11 @@ def build_model(cfg: ModelConfig) -> nn.Module:
 # ---------------------------------------------------------------------------
 
 def set_train_mode(model: nn.Module, cfg: ModelConfig) -> None:
+    """Đặt model về train, nhưng giữ BatchNorm đã đóng băng ở eval."""
     model.train()
     if cfg.freeze_bn_stats:
         for module in model.modules():
             if isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
-                # Nếu không có tham số affine/trainable, giữ eval để không cập nhật running stats
                 params = list(module.parameters(recurse=False))
                 if not params or all(not p.requires_grad for p in params):
                     module.eval()
@@ -220,10 +205,10 @@ def get_param_groups(
     Group 2 (chỉ khi có backbone trainable): tham số trainable còn lại (lr_backbone).
     Không tạo nhóm rỗng, không trùng, không bỏ sót.
     """
-    head_ids = _head_param_ids(model, cfg)
+    head_ids = {id(p) for p in _head_params(model, cfg.arch)}
 
-    head_params = []
-    backbone_params = []
+    head_params: list[nn.Parameter] = []
+    backbone_params: list[nn.Parameter] = []
 
     for p in model.parameters():
         if not p.requires_grad:

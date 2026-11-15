@@ -25,7 +25,6 @@ from .model_builder import (
     get_param_groups,
     set_train_mode,
     ModelConfig,
-    ARCH_SPECS,
 )
 
 from .engine import (
