@@ -38,7 +38,7 @@ Ba runs `v2` mỗi run chỉ thay một yếu tố so với `v1_resnet18`, giữ
 | DataLoader và seed | Tạo riêng loader cho mỗi run sau khi gọi seed; Train DataLoader có generator riêng. `pin_memory=torch.cuda.is_available()`, độc lập với device được chọn. |
 | Stratified split | Phạm vi cam kết hiện tại chỉ là CIFAR-10 cân bằng, `val_size=5000`; không khẳng định hỗ trợ mọi phân phối nhãn. |
 | Huấn luyện | Checkpoint chọn bằng `val_acc` mặc định (có hỗ trợ `val_loss`); không dùng Test để chọn mô hình. |
-| Fine-tuning | Head LR `1e-3`, backbone LR `1e-4`; 3 epoch tiếp theo; optimizer mới; `start_epoch=5`; artifacts riêng. |
+| Fine-tuning | Head LR `1e-3`, backbone LR `1e-4`; tối đa 20 epoch (early stopping); optimizer mới; `start_epoch=5`; artifacts riêng. |
 | TensorBoard | `runs/<experiment>`; epoch offset nối tiếp giữa hai giai đoạn. |
 | Tính tái lập | Seed 42 và `deterministic=True`; cam kết trong cùng môi trường, không cam kết giống hệt giữa phần cứng/phiên bản thư viện khác nhau. |
 | Evaluation | Wilson 95% CI mô tả từng accuracy, không dùng chồng lấp CI làm kiểm định so sánh; 5 đại lượng chi phí (params, file size, train time, latency, peak GPU memory); latency dùng batch 32; PNG 150 dpi. |

@@ -14,11 +14,11 @@ Dự án có **3 run** hiện hành (artifacts, outputs và logs tách riêng th
 
 | Run (`RUN_ID`) | Mô hình | Cơ chế huấn luyện | Epochs | LR (head / backbone) | Batch | Khởi tạo từ | Mục đích |
 |---|---|---|---|---|---|---|---|
-| `v0_vgg16` | VGG16 (`vgg16(weights='IMAGENET1K_V1')`) | Feature Extraction (G1: đóng băng backbone, chỉ train `classifier[6]` 4096→10, trainable 40,970 tham số) | 3 | 1e-3 / — | 32 | ImageNet | So sánh kiến trúc |
-| `v1_resnet18` | ResNet-18 (`resnet18(weights='IMAGENET1K_V1')`) | Feature Extraction (chỉ train `fc` 512→10) | 3 | 1e-3 / — | 32 | ImageNet | **Baseline** |
-| `v1_resnet18_finetune` | ResNet-18 | Fine-Tuning: mở khóa `layer4` + `fc` | 3 | 1e-3 / 1e-4 | 32 | `v1_resnet18/best_model.pth` | Tác động của Fine-Tuning (**run fine-tune duy nhất**) |
+| `v0_vgg16` | VGG16 (`vgg16(weights='IMAGENET1K_V1')`) | Feature Extraction (G1: đóng băng backbone, chỉ train `classifier[6]` 4096→10, trainable 40,970 tham số) | 20 (early stopping) | 1e-3 / — | 32 | ImageNet | So sánh kiến trúc |
+| `v1_resnet18` | ResNet-18 (`resnet18(weights='IMAGENET1K_V1')`) | Feature Extraction (chỉ train `fc` 512→10) | 20 (early stopping) | 1e-3 / — | 32 | ImageNet | **Baseline** |
+| `v1_resnet18_finetune` | ResNet-18 | Fine-Tuning: mở khóa `layer4` + `fc` | 20 (early stopping) | 1e-3 / 1e-4 | 32 | `v1_resnet18/best_model.pth` | Tác động của Fine-Tuning (**run fine-tune duy nhất**) |
 
-> **Ghi chú epochs:** cấu hình hiện tại dùng 3 epoch để thử nghiệm nhanh; có thể tăng Feature Extraction lên 5 epoch khi chạy chính thức.
+> **Ghi chú epochs:** cấu hình hiện tại dùng 20 epoch tối đa với Early Stopping (patience=5, min_delta=1e-4) và LR scheduler ReduceLROnPlateau (factor=0.5, patience=3). Huấn luyện có thể dừng sớm nếu Validation không cải thiện.
 
 > **Hướng B (native, hiện hành):** `build_model` trả model torchvision đã adapt trực tiếp (không wrapper `MyModel`), `state_dict` dùng key gốc (`conv1.*`, `layer*`, `fc.*` cho ResNet-18; `features.*`, `classifier.*` cho VGG16). Checkpoint/artifacts format cũ (`backbone.*`/`head.*`) **không tương thích** (không migrate). Khi chuyển sang format mới cần `FORCE_RETRAIN=True` hoặc dọn `artifacts/v0_vgg16`, `artifacts/v1_resnet18`, `artifacts/v1_resnet18_finetune` rồi train lại theo thứ tự `v0_vgg16` → `v1_resnet18` → `v1_resnet18_finetune`. `utils.load_model` / `utils.load_checkpoint` sẽ báo lỗi rõ nếu phát hiện format cũ.
 

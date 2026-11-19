@@ -206,7 +206,7 @@ Ví dụ kiểm chứng: $p = 0.5$, $n = 100$ cho khoảng xấp xỉ $[0.4038, 
 
 | Chỉ số | Hàm / nguồn | Cách đo | Lưu ý |
 | :--- | :--- | :--- | :--- |
-| Thời gian huấn luyện | `build_cost_record(history=..., source_history=None)` | `train_time_phase_s` là tổng epoch của run hiện tại; `train_time_total_s` cộng thời gian nguồn `init_from` nếu có | Fine-tune báo riêng thời gian 3 epoch của phase và tổng thời gian baseline + fine-tune; nguồn lấy từ history của baseline đã lưu. |
+| Thời gian huấn luyện | `build_cost_record(history=..., source_history=None)` | `train_time_phase_s` là tổng epoch của run hiện tại; `train_time_total_s` cộng thời gian nguồn `init_from` nếu có | Fine-tune báo riêng thời gian phase hiện tại và tổng thời gian baseline + fine-tune; nguồn lấy từ history của baseline đã lưu. |
 | Thời gian suy luận | `measure_inference_time` | Trung vị của `repeats` lượt trên một batch cố định, sau `warmup` lượt bỏ đi | Trên GPU gọi `torch.cuda.synchronize()` trước khi đọc đồng hồ, vì phép tính GPU bất đồng bộ. |
 | Bộ nhớ GPU đỉnh | `measure_inference_time` | `torch.cuda.max_memory_allocated` sau `reset_peak_memory_stats` | `None` trên CPU. |
 | Dung lượng tệp | `file_size_mb` | Kích thước `best_model.pth` (MiB) | `.pth` bị loại khỏi Git nên phải ghi vào JSON. |

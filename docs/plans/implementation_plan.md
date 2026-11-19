@@ -15,9 +15,9 @@ Các tài liệu `00`–`05` mô tả thiết kế mục tiêu, không mặc nhi
 
 ### Phạm vi thực nghiệm đã chốt (6 runs)
 
-1. `v0_vgg16` — VGG16 Feature Extraction, 3 epochs (thử nghiệm; có thể tăng lên 5).
-2. `v1_resnet18` — ResNet-18 Feature Extraction baseline, 3 epochs.
-3. `v1_resnet18_finetune` — **run fine-tune duy nhất**: tiếp tục từ checkpoint tốt nhất của `v1_resnet18`, mở `layer4` và head, 3 epochs.
+1. `v0_vgg16` — VGG16 Feature Extraction, 20 epochs (early stopping; tối đa 20).
+2. `v1_resnet18` — ResNet-18 Feature Extraction baseline, 20 epochs (early stopping).
+3. `v1_resnet18_finetune` — **run fine-tune duy nhất**: tiếp tục từ checkpoint tốt nhất của `v1_resnet18`, mở `layer4` và head, 20 epochs (early stopping).
 
 Ba runs `v2` mỗi run chỉ thay đúng một yếu tố so với `v1_resnet18`, giữ nguyên seed, dữ liệu, kiến trúc và số epochs; không bổ sung run đối chứng 8 epoch. Đây là khảo sát có kiểm soát LR và batch size theo yêu cầu lab, không phải grid search toàn diện.
 
@@ -128,9 +128,9 @@ Ba runs `v2` mỗi run chỉ thay đúng một yếu tố so với `v1_resnet18`
 
 | Thứ tự | Run | Phụ thuộc | Ghi chú cấu hình |
 | :--- | :--- | :--- | :--- |
-| 1 | `v0_vgg16` | Không | VGG16, Feature Extraction, 3 epochs (thử nghiệm), batch 32, LR head 1e-3 |
-| 2 | `v1_resnet18` | Không | ResNet-18, Feature Extraction, 3 epochs (thử nghiệm), batch 32, LR head 1e-3 (baseline) |
-| 3 | `v1_resnet18_finetune` | `best_model.pth` của `v1_resnet18` | ResNet-18, mở `layer4` (**run fine-tune duy nhất**), 3 epochs, batch 32, LR head 1e-3, LR backbone 1e-4 |
+| 1 | `v0_vgg16` | Không | VGG16, Feature Extraction, 20 epochs (early stopping), batch 32, LR head 1e-3 |
+| 2 | `v1_resnet18` | Không | ResNet-18, Feature Extraction, 20 epochs (early stopping), batch 32, LR head 1e-3 (baseline) |
+| 3 | `v1_resnet18_finetune` | `best_model.pth` của `v1_resnet18` | ResNet-18, mở `layer4` (**run fine-tune duy nhất**), 20 epochs (early stopping), batch 32, LR head 1e-3, LR backbone 1e-4 |
 
 - Thực thi trên môi trường tăng tốc GPU (Colab / GPU local); ghi nhận thiết bị và phiên bản thư viện vào `config.json`.
 - Mỗi run có thể thực thi ở phiên Colab riêng; không yêu cầu hoàn tất cả run trong một phiên. Trên Colab, giữ thư mục artifacts trong Drive và cập nhật checkpoint/history sau mỗi epoch hoàn tất.

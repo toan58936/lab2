@@ -107,21 +107,22 @@ Luồng: `Notebook → data_setup + model_builder → engine.train → artifacts
 | `seed` | 42 | |
 | `val_size` | 5000 | 10% của Train gốc |
 | `batch_size` | 32 | |
-| `epochs` (Feature Extraction) | 3 | Cấu hình thử nghiệm hiện tại (có thể tăng lên 5 khi chạy chính thức) |
+| `epochs` (Feature Extraction) | 20 | Tối đa 20 epoch; Early Stopping (patience=5, min_delta=1e-4) có thể dừng sớm |
 | `lr_head` | 1e-3 | Optimizer Adam |
-| `epochs` (Fine-Tuning) | 3 | Chạy tiếp từ baseline |
+| `epochs` (Fine-Tuning) | 20 | Chạy tiếp từ baseline; Early Stopping (patience=5, min_delta=1e-4) |
 | `lr_backbone` | 1e-4 | Chỉ áp dụng cho khối được mở khóa |
 | `unfreeze_last_n` | 1 | ResNet-18: `layer4` |
+| `scheduler` | ReduceLROnPlateau | factor=0.5, patience=3, min_lr=1e-6 |
 
 ### 7.3. Danh mục thí nghiệm (hiện hành)
 
 | Thí nghiệm | Kiến trúc | Chiến lược | Epochs | `lr_head` / `lr_backbone` | Batch | Khởi tạo từ | Mục đích |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `v0_vgg16` | VGG16 (native, G1: thay `classifier[6]`) | Feature Extraction | 3 | 1e-3 / — | 32 | ImageNet (`IMAGENET1K_V1`) | So sánh kiến trúc |
-| `v1_resnet18` | ResNet-18 (native, thay `fc`) | Feature Extraction | 3 | 1e-3 / — | 32 | ImageNet (`IMAGENET1K_V1`) | **Baseline** |
-| `v1_resnet18_finetune` | ResNet-18 (native) | Fine-Tuning | 3 | 1e-3 / 1e-4 | 32 | `v1_resnet18` | Tác động của Fine-Tuning (run fine-tune duy nhất) |
+| `v0_vgg16` | VGG16 (native, G1: thay `classifier[6]`) | Feature Extraction | 20 (early stopping) | 1e-3 / — | 32 | ImageNet (`IMAGENET1K_V1`) | So sánh kiến trúc |
+| `v1_resnet18` | ResNet-18 (native, thay `fc`) | Feature Extraction | 20 (early stopping) | 1e-3 / — | 32 | ImageNet (`IMAGENET1K_V1`) | **Baseline** |
+| `v1_resnet18_finetune` | ResNet-18 (native) | Fine-Tuning | 20 (early stopping) | 1e-3 / 1e-4 | 32 | `v1_resnet18` | Tác động của Fine-Tuning (run fine-tune duy nhất) |
 
-> **Ghi chú epochs:** Cấu hình hiện tại dùng 3 epoch để thử nghiệm nhanh; có thể tăng Feature Extraction lên 5 epoch khi chạy chính thức.
+> **Ghi chú epochs:** Cấu hình hiện tại dùng tối đa 20 epoch với Early Stopping (patience=5, min_delta=1e-4) và LR scheduler ReduceLROnPlateau (factor=0.5, patience=3).
 >
 > **Hướng B (native):** `build_model` trả về model torchvision đã adapt trực tiếp (không wrapper), `state_dict` dùng key gốc. Artifacts/checkpoint format cũ (`backbone.*`/`head.*`) không tương thích, không migrate; cần `FORCE_RETRAIN`/dọn artifacts 3 run và train lại theo format mới. Hợp đồng flat export hiện hành của `going_modular` gồm 12 symbols (không có `MyModel`): `ModelConfig, build_model, count_params, set_train_mode, get_param_groups, create_train_val_test_dataloaders, train, evaluate_step, set_seed, get_device, run_inference, evaluate_predictions`.
 

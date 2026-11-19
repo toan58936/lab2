@@ -53,7 +53,7 @@ Tích hợp `notebooks/pretrained_models.ipynb` với các API module đã hoàn
 - [x] Với `v1_resnet18_finetune`, nạp `best_model.pth` của `v1_resnet18` vào ResNet-18 được dựng với `weights=None`.
 - [x] Cấu hình mở `layer4` và head; không thao tác qua wrapper `.model`.
 - [x] Dùng optimizer mới với parameter groups riêng: head LR `1e-3`, backbone LR `1e-4`.
-- [x] Đặt `start_epoch=5`; phase vẫn train đúng 3 epochs, còn TensorBoard/global epoch tiếp tục từ baseline.
+- [x] Đặt `start_epoch=5`; phase vẫn train đúng tối đa 20 epochs (early stopping), còn TensorBoard/global epoch tiếp tục từ baseline.
 - [x] Gắn `source_history` của baseline khi tính tổng train time; không cộng thời gian nguồn vào thời gian phase hiện tại.
 
 ## 6. Reuse và đánh giá

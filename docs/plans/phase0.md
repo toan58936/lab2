@@ -14,9 +14,9 @@
 ## 2. Chốt phạm vi thực nghiệm
 
 - [x] Có đúng sáu runs trong `00` và kế hoạch:
-  - [x] `v0_vgg16`: VGG16 Feature Extraction, 5 epochs.
-  - [x] `v1_resnet18`: ResNet-18 Feature Extraction, 5 epochs; baseline.
-  - [x] `v1_resnet18_finetune`: khởi tạo từ checkpoint tốt nhất của baseline, mở `layer4` và head, 3 epochs.
+  - [x] `v0_vgg16`: VGG16 Feature Extraction, 20 epochs (early stopping).
+  - [x] `v1_resnet18`: ResNet-18 Feature Extraction, 20 epochs (early stopping); baseline.
+  - [x] `v1_resnet18_finetune`: khởi tạo từ checkpoint tốt nhất của baseline, mở `layer4` và head, 20 epochs (early stopping).
   - [x] `v2_resnet18_lr1e-2`: ResNet-18 Feature Extraction, chỉ đổi head LR thành `1e-2`.
   - [x] `v2_resnet18_lr1e-4`: ResNet-18 Feature Extraction, chỉ đổi head LR thành `1e-4`.
   - [x] `v2_resnet18_bs64`: ResNet-18 Feature Extraction, chỉ đổi batch size thành `64`.
@@ -31,7 +31,7 @@
   - [x] Fine-Tuning khởi tạo từ checkpoint baseline với kiến trúc dựng bằng `weights=None`.
   - [x] Optimizer Fine-Tuning là optimizer mới; LR head `1e-3`, LR backbone mở khóa `1e-4`.
   - [x] BatchNorm của phần backbone đóng băng tiếp tục ở eval mode theo chính sách đã chốt.
-  - [x] `start_epoch=5` là offset hiển thị/log; Fine-Tuning vẫn chạy 3 epochs trong phase.
+  - [x] `start_epoch=5` là offset hiển thị/log; Fine-Tuning vẫn chạy tối đa 20 epochs (early stopping) trong phase.
 - [x] Quy trình dữ liệu thống nhất:
   - [x] Mỗi run tạo DataLoader riêng sau khi thiết lập seed.
   - [x] Train DataLoader nhận generator riêng; Validation/Test không shuffle.
