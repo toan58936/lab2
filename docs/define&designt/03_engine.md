@@ -164,7 +164,7 @@ Chi tiết từng test nằm trong `tests/test_engine.py`. Chạy: `pytest tests
 
 ## 9. Ngoài phạm vi
 
-- Early stopping, learning-rate scheduler, huấn luyện nhiều GPU.
+- Huấn luyện nhiều GPU.
 - Khôi phục trạng thái RNG khi resume.
 - Đo hiệu năng GPU và hành vi riêng của GPU/MPS.
 

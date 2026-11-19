@@ -38,7 +38,6 @@ Huấn luyện mạng nơ-ron sâu từ đầu cho phân loại ảnh tốn nhi�
 
 **Ngoài phạm vi**
 - Grid search toàn diện, nhiều seed, kiểm định thống kê giữa các mô hình.
-- Early stopping, learning-rate scheduler.
 - Kiến trúc khác (DenseNet...) ngoài VGG16 và ResNet-18.
 
 ## 4. Yêu cầu

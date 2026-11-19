@@ -57,9 +57,11 @@ def run_inference(model: torch.nn.Module,
     model.to(device)
     model.eval()
     logits_all, targets = [], []
+    is_cuda = torch.device(device).type == "cuda" if not isinstance(device, torch.device) else device.type == "cuda"
     with torch.inference_mode():
         for X, y in dataloader:
-            logits_all.append(model(X.to(device)).cpu())
+            X = X.to(device, non_blocking=is_cuda)
+            logits_all.append(model(X).cpu())
             targets.append(y.cpu())
     if not logits_all:
         raise ValueError("The dataloader is empty.")

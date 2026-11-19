@@ -42,7 +42,7 @@ Ba runs `v2` mỗi run chỉ thay một yếu tố so với `v1_resnet18`, giữ
 | TensorBoard | `runs/<experiment>`; epoch offset nối tiếp giữa hai giai đoạn. |
 | Tính tái lập | Seed 42 và `deterministic=True`; cam kết trong cùng môi trường, không cam kết giống hệt giữa phần cứng/phiên bản thư viện khác nhau. |
 | Evaluation | Wilson 95% CI mô tả từng accuracy, không dùng chồng lấp CI làm kiểm định so sánh; 5 đại lượng chi phí (params, file size, train time, latency, peak GPU memory); latency dùng batch 32; PNG 150 dpi. |
-| Ngoài phạm vi | Early stopping, scheduler, nhiều seed, McNemar và grid search toàn diện. |
+| Ngoài phạm vi | Nhiều seed, McNemar và grid search toàn diện. |
 
 ## 3. Chính sách transforms và luồng dữ liệu
 
